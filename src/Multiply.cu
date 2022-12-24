@@ -35,40 +35,39 @@ __global__ void k_Multiply(const IN1_T* in1, const IN2_T* in2, OUT_T* out) {
 }
 
 MultiplyCcc::MultiplyCcc(int32_t cudaDevice, cudaStream_t cudaStream)
-    : mCudaDevice(cudaDevice), mCudaStream(cudaStream) {}
+    : mInputBuffers(2), mCudaDevice(cudaDevice), mCudaStream(cudaStream),
+      mBufferCheckedOut(false) {}
 
-Buffer MultiplyCcc::requestBuffer(size_t port, size_t numBytes) {
+shared_ptr<Buffer> MultiplyCcc::requestBuffer(size_t port, size_t numBytes) {
   if (port >= mInputBuffers.size()) {
     throw runtime_error("Port [" + to_string(port) + "] is out of range");
   }
 
+  if (mBufferCheckedOut) {
+    throw runtime_error("Cannot request buffer - it is already checked out");
+  }
+
   CudaDevicePushPop setAndRestore(mCudaDevice);
-  ensureMinCapacityAligned(
+  ensureMinCapacityAlignedCuda(
       &mInputBuffers[port],
       numBytes,
       mAlignment * sizeof(cuComplex),
       mCudaStream);
 
-  return mInputBuffers[port].sliceRemainingUnowned();
+  return mInputBuffers[port]->sliceRemaining();
 }
 
 void MultiplyCcc::commitBuffer(size_t port, size_t numBytes) {
-  if (port >= 2) {
+  if (port >= mInputBuffers.size()) {
     throw runtime_error("Port [" + to_string(port) + "] is out of range");
   }
 
-  OwnedBuffer& buffer = mInputBuffers[port];
-
-  const size_t newEndIndex = buffer.end + numBytes;
-
-  if (newEndIndex > buffer.capacity) {
-    throw runtime_error(
-        "Committed byte count [" + to_string(numBytes) + "] at offset ["
-        + to_string(buffer.end) + "] exceeds capacity ["
-        + to_string(buffer.capacity) + "]");
+  if (!mBufferCheckedOut) {
+    throw runtime_error("Buffer cannot be committed - it was not checked out");
   }
 
-  buffer.end += numBytes;
+  mInputBuffers[port]->increaseEndOffset(numBytes);
+  mBufferCheckedOut = false;
 }
 
 size_t MultiplyCcc::getOutputDataSize(size_t port) {
@@ -76,8 +75,8 @@ size_t MultiplyCcc::getOutputDataSize(size_t port) {
 }
 
 size_t MultiplyCcc::getAvailableNumInputElements() const {
-  const size_t port0NumElements = mInputBuffers[0].used() / sizeof(cuComplex);
-  const size_t port1NumElements = mInputBuffers[1].used() / sizeof(cuComplex);
+  const size_t port0NumElements = mInputBuffers[0]->used() / sizeof(cuComplex);
+  const size_t port1NumElements = mInputBuffers[1]->used() / sizeof(cuComplex);
   const size_t numInputElements = min(port0NumElements, port1NumElements);
 
   return numInputElements;
@@ -87,17 +86,17 @@ size_t MultiplyCcc::getOutputSizeAlignment(size_t port) {
   return mAlignment * sizeof(cuComplex);
 }
 
-void MultiplyCcc::readOutput(Buffer* portOutputs, size_t portOutputCount) {
-  if (portOutputCount < 1) {
+void MultiplyCcc::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
+  if (portOutputs.empty()) {
     throw runtime_error("One output port is required");
   }
 
   CudaDevicePushPop setAndRestore(mCudaDevice);
 
   const size_t numInputElements = getAvailableNumInputElements();
-  Buffer& outputBuffer = portOutputs[0];
+  const auto& outputBuffer = portOutputs[0];
   const size_t maxNumOutputElements =
-      outputBuffer.remaining() / sizeof(cuComplex);
+      outputBuffer->remaining() / sizeof(cuComplex);
 
   const size_t maxUnalignedNumElementsToProcess =
       min(numInputElements, maxNumOutputElements);
@@ -110,10 +109,12 @@ void MultiplyCcc::readOutput(Buffer* portOutputs, size_t portOutputCount) {
 
   k_Multiply<cuComplex, cuComplex, cuComplex>
       <<<blocks, threads, 0, mCudaStream>>>(
-          mInputBuffers[0].readPtr<cuComplex>(),
-          mInputBuffers[1].readPtr<cuComplex>(),
-          portOutputs[0].writePtr<cuComplex>());
+          mInputBuffers[0]->readPtr<cuComplex>(),
+          mInputBuffers[1]->readPtr<cuComplex>(),
+          portOutputs[0]->writePtr<cuComplex>());
 
   const size_t writtenNumBytes = processNumInputElements * sizeof(cuComplex);
-  portOutputs[0].end += writtenNumBytes;
+  outputBuffer->increaseEndOffset(writtenNumBytes);
+  mInputBuffers[0]->increaseOffset(writtenNumBytes);
+  mInputBuffers[1]->increaseOffset(writtenNumBytes);
 }

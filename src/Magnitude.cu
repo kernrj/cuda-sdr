@@ -35,21 +35,26 @@ __global__ void k_Magnitude(const cuComplex* in, float* out) {
 }
 
 Magnitude::Magnitude(int32_t cudaDevice, cudaStream_t cudaStream)
-    : mCudaDevice(cudaDevice), mCudaStream(cudaStream) {}
+    : mCudaDevice(cudaDevice), mCudaStream(cudaStream),
+      mBufferCheckedOut(false) {}
 
-Buffer Magnitude::requestBuffer(size_t port, size_t numBytes) {
+shared_ptr<Buffer> Magnitude::requestBuffer(size_t port, size_t numBytes) {
   if (port >= 1) {
     throw runtime_error("Port [" + to_string(port) + "] is out of range");
   }
 
+  if (mBufferCheckedOut) {
+    throw runtime_error("Cannot request buffer - it is already checked out");
+  }
+
   CudaDevicePushPop setAndRestore(mCudaDevice);
-  ensureMinCapacityAligned(
+  ensureMinCapacityAlignedCuda(
       &mInputBuffer,
       numBytes,
       mAlignment * sizeof(cuComplex),
       mCudaStream);
 
-  return mInputBuffer.sliceRemainingUnowned();
+  return mInputBuffer->sliceRemaining();
 }
 
 void Magnitude::commitBuffer(size_t port, size_t numBytes) {
@@ -57,16 +62,12 @@ void Magnitude::commitBuffer(size_t port, size_t numBytes) {
     throw runtime_error("Port [" + to_string(port) + "] is out of range");
   }
 
-  const size_t newEndIndex = mInputBuffer.end + numBytes;
-
-  if (newEndIndex > mInputBuffer.capacity) {
-    throw runtime_error(
-        "Committed byte count [" + to_string(numBytes) + "] at offset ["
-        + to_string(mInputBuffer.end) + "] exceeds capacity ["
-        + to_string(mInputBuffer.capacity) + "]");
+  if (!mBufferCheckedOut) {
+    throw runtime_error("Buffer cannot be committed - it was not checked out");
   }
 
-  mInputBuffer.end += numBytes;
+  mInputBuffer->increaseEndOffset(numBytes);
+  mBufferCheckedOut = false;
 }
 
 size_t Magnitude::getOutputDataSize(size_t port) {
@@ -74,23 +75,23 @@ size_t Magnitude::getOutputDataSize(size_t port) {
 }
 
 size_t Magnitude::getAvailableNumInputElements() const {
-  return mInputBuffer.used() / sizeof(cuComplex);
+  return mInputBuffer->used() / sizeof(cuComplex);
 }
 
 size_t Magnitude::getOutputSizeAlignment(size_t port) {
   return mAlignment * sizeof(float);
 }
 
-void Magnitude::readOutput(Buffer* portOutputs, size_t portOutputCount) {
-  if (portOutputCount < 1) {
+void Magnitude::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
+  if (portOutputs.empty()) {
     throw runtime_error("One output port is required");
   }
 
   CudaDevicePushPop setAndRestore(mCudaDevice);
 
   const size_t numInputElements = getAvailableNumInputElements();
-  Buffer& outputBuffer = portOutputs[0];
-  const size_t maxNumOutputElements = outputBuffer.remaining() / sizeof(float);
+  const auto& outputBuffer = portOutputs[0];
+  const size_t maxNumOutputElements = outputBuffer->remaining() / sizeof(float);
 
   const size_t maxUnalignedNumElementsToProcess =
       min(numInputElements, maxNumOutputElements);
@@ -102,9 +103,11 @@ void Magnitude::readOutput(Buffer* portOutputs, size_t portOutputCount) {
   const dim3 threads = dim3(mAlignment);
 
   k_Magnitude<<<blocks, threads, 0, mCudaStream>>>(
-      mInputBuffer.readPtr<cuComplex>(),
-      portOutputs[0].writePtr<float>());
+      mInputBuffer->readPtr<cuComplex>(),
+      portOutputs[0]->writePtr<float>());
 
+  const size_t readNumBytes = processNumInputElements * sizeof(cuComplex);
   const size_t writtenNumBytes = processNumInputElements * sizeof(float);
-  portOutputs[0].end += writtenNumBytes;
+  outputBuffer->increaseEndOffset(writtenNumBytes);
+  mInputBuffer->increaseOffset(readNumBytes);
 }

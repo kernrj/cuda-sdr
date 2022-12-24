@@ -31,7 +31,8 @@ class CosineSource : public Source {
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) override;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(Buffer* portOutputs, size_t portOutputCount) override;
+  void readOutput(
+      const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
 
  private:
   float mSampleRate;

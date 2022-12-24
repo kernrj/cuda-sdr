@@ -29,18 +29,22 @@ class AddConstToVectorLength : public Filter {
       cudaStream_t cudaStream);
   ~AddConstToVectorLength() override = default;
 
-  [[nodiscard]] Buffer requestBuffer(size_t port, size_t numBytes) override;
+  [[nodiscard]] std::shared_ptr<Buffer> requestBuffer(
+      size_t port,
+      size_t numBytes) override;
   void commitBuffer(size_t port, size_t numBytes) override;
   [[nodiscard]] size_t getOutputDataSize(size_t port) override;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(Buffer* portOutputs, size_t portOutputCount) override;
+  void readOutput(
+      const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
 
  private:
   static const size_t mAlignment;
   float mAddValueToAmplitude;
   int32_t mCudaDevice;
   cudaStream_t mCudaStream;
-  OwnedBuffer mInputBuffer;
+  std::shared_ptr<Buffer> mInputBuffer;
+  bool mBufferCheckedOut;
 
  private:
   [[nodiscard]] size_t getAvailableNumInputElements() const;

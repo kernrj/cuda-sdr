@@ -58,16 +58,16 @@ size_t CosineSource::getOutputSizeAlignment(size_t port) {
   return mAlignment * sizeof(cuComplex);
 }
 
-void CosineSource::readOutput(Buffer* portOutputs, size_t portOutputCount) {
-  if (portOutputCount < 1) {
+void CosineSource::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
+  if (portOutputs.empty()) {
     throw runtime_error("One output port is required");
   }
 
   CudaDevicePushPop setAndRestoreDevice(mCudaDevice);
 
-  Buffer& output = portOutputs[0];
+  const auto& output = portOutputs[0];
 
-  const size_t maxOutputNumValues = output.remaining() / sizeof(cuComplex);
+  const size_t maxOutputNumValues = output->remaining() / sizeof(cuComplex);
   const size_t blockCount = maxOutputNumValues / mAlignment;
 
   const dim3 blocks(blockCount);
@@ -76,7 +76,7 @@ void CosineSource::readOutput(Buffer* portOutputs, size_t portOutputCount) {
   k_ComplexCosine<<<blocks, threads, 0, mCudaStream>>>(
       mIndexToRadiansMultiplier,
       mPhi,
-      output.writePtr<cuComplex>());
+      output->writePtr<cuComplex>());
 
   const size_t outputNumValues = blockCount * mAlignment;
   mPhi += static_cast<float>(outputNumValues) * mIndexToRadiansMultiplier;
@@ -84,5 +84,5 @@ void CosineSource::readOutput(Buffer* portOutputs, size_t portOutputCount) {
 
   const size_t outputNumBytes = outputNumValues * sizeof(cuComplex);
 
-  output.end += outputNumBytes;
+  output->increaseEndOffset(outputNumBytes);
 }

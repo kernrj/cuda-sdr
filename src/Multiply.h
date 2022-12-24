@@ -26,17 +26,21 @@ class MultiplyCcc : public Filter {
   MultiplyCcc(int32_t cudaDevice, cudaStream_t cudaStream);
   ~MultiplyCcc() override = default;
 
-  [[nodiscard]] Buffer requestBuffer(size_t port, size_t numBytes) override;
+  [[nodiscard]] std::shared_ptr<Buffer> requestBuffer(
+      size_t port,
+      size_t numBytes) override;
   void commitBuffer(size_t port, size_t numBytes) override;
   [[nodiscard]] size_t getOutputDataSize(size_t port) override;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(Buffer* portOutputs, size_t portOutputCount) override;
+  void readOutput(
+      const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
 
  private:
   static const size_t mAlignment;
   int32_t mCudaDevice;
   cudaStream_t mCudaStream;
-  std::array<OwnedBuffer, 2> mInputBuffers;
+  std::vector<std::shared_ptr<Buffer>> mInputBuffers;
+  bool mBufferCheckedOut;
 
  private:
   [[nodiscard]] size_t getAvailableNumInputElements() const;

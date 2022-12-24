@@ -46,21 +46,25 @@ CudaInt8ToFloat::CudaInt8ToFloat(int32_t cudaDevice, cudaStream_t cudaStream)
     : mCudaDevice(cudaDevice), mCudaStream(cudaStream),
       mBufferCheckedOut(false) {}
 
-Buffer CudaInt8ToFloat::requestBuffer(size_t port, size_t numBytes) {
+shared_ptr<Buffer> CudaInt8ToFloat::requestBuffer(size_t port, size_t numBytes) {
   if (port > 0) {
     throw runtime_error("Port [" + to_string(port) + "] is out of range");
   }
 
+  if (mBufferCheckedOut) {
+    throw runtime_error("Cannot request buffer - it is already checked out");
+  }
+
   CudaDevicePushPop setAndRestore(mCudaDevice);
 
-  ensureMinCapacityAligned(
-      &mBuffer,
+  ensureMinCapacityAlignedCuda(
+      &mInputBuffer,
       numBytes,
       mAlignment * sizeof(uint8_t),
       mCudaStream);
 
   mBufferCheckedOut = true;
-  return mBuffer.sliceRemainingUnowned();
+  return mInputBuffer->sliceRemaining();
 }
 
 void CudaInt8ToFloat::commitBuffer(size_t port, size_t numBytes) {
@@ -68,14 +72,8 @@ void CudaInt8ToFloat::commitBuffer(size_t port, size_t numBytes) {
     throw runtime_error("Buffer cannot be committed - it was not checked out");
   }
 
-  if (mBuffer.end + numBytes > mBuffer.capacity) {
-    throw runtime_error(
-        "Unable to commit [" + to_string(numBytes) + "] bytes. The maximum is ["
-        + to_string(mBuffer.capacity - mBuffer.end) + "]");
-  }
-
+  mInputBuffer->increaseEndOffset(numBytes);
   mBufferCheckedOut = false;
-  mBuffer.end += numBytes;
 }
 
 size_t CudaInt8ToFloat::getOutputDataSize(size_t port) {
@@ -83,32 +81,33 @@ size_t CudaInt8ToFloat::getOutputDataSize(size_t port) {
     throw invalid_argument("Port [" + to_string(port) + "] is out of range");
   }
 
-  return mBuffer.used();
+  return mInputBuffer->used();
 }
 
 size_t CudaInt8ToFloat::getOutputSizeAlignment(size_t port) {
   return mAlignment;
 }
 
-void CudaInt8ToFloat::readOutput(Buffer* portOutputs, size_t portOutputCount) {
-  if (portOutputCount < 1) {
+void CudaInt8ToFloat::readOutput(
+    const vector<shared_ptr<Buffer>>& portOutputs) {
+  if (portOutputs.empty()) {
     throw invalid_argument("One output port is required");
   }
 
   CudaDevicePushPop setAndRestore(mCudaDevice);
 
-  Buffer& outputBuffer = portOutputs[0];
+  const auto& outputBuffer = portOutputs[0];
 
   const size_t elementCount =
-      min(mBuffer.used(), outputBuffer.remaining() / sizeof(float));
+      min(mInputBuffer->used(), outputBuffer->remaining() / sizeof(float));
   dim3 blocks = dim3((elementCount + mAlignment - 1) / mAlignment);
   dim3 threads = dim3(mAlignment);
 
   k_int8ToFloat<<<blocks, threads, 0, mCudaStream>>>(
-      mBuffer.readPtr<int8_t>(),
-      outputBuffer.writePtr<float>());
+      mInputBuffer->readPtr<int8_t>(),
+      outputBuffer->writePtr<float>());
 
-  outputBuffer.end += elementCount * sizeof(float);
-  mBuffer.offset = 0;
-  mBuffer.end = 0;
+  outputBuffer->increaseEndOffset(elementCount * sizeof(float));
+  mInputBuffer->increaseOffset(elementCount * sizeof(int8_t));
+  moveUsedToStartCuda(mInputBuffer.get(), mCudaStream);
 }

@@ -18,6 +18,7 @@
 #define SDRTEST_SRC_FILTER_H_
 
 #include <string>
+#include <vector>
 
 #include "Buffer.h"
 
@@ -31,14 +32,16 @@ class Sink {
    * A call to commitLastRequestedBuffer() must be made before requestBuffer()
    * can be called again.
    *
-   * The returned Buffer's capacity may be larger than byteCount. Any extra
-   * capacity can be freely used.
+   * The returned Buffer's mCapacity may be larger than byteCount. Any extra
+   * mCapacity can be freely used.
    */
-  [[nodiscard]] virtual Buffer requestBuffer(size_t port, size_t byteCount) = 0;
+  [[nodiscard]] virtual std::shared_ptr<Buffer> requestBuffer(
+      size_t port,
+      size_t byteCount) = 0;
 
   /**
-   * Commits the buffer, and specifies the number of bytes actually consumed.
-   * The byteCount must be <= the capacity of the Buffer returned in the most
+   * Commits the mInputBuffer, and specifies the number of bytes actually consumed.
+   * The byteCount must be <= the mCapacity of the Buffer returned in the most
    * recent call to requestBuffer().
    *
    * Committing causes the Sink to process the data.
@@ -63,12 +66,12 @@ class Source {
   [[nodiscard]] virtual size_t getOutputDataSize(size_t port) = 0;
 
   /**
-   * To account for vectorized optimizations, the capacity of the Buffer passed
+   * To account for vectorized optimizations, the mCapacity of the Buffer passed
    * to the next call to readOutput() for the given port must be at least the
    * next highest multiple of the returned value above getOutputDataSize() for
    * this port.
    *
-   * To calculate the minimum buffer size, use getNextOutputBufferMinSize().
+   * To calculate the minimum mInputBuffer size, use getNextOutputBufferMinSize().
    */
   [[nodiscard]] virtual size_t getOutputSizeAlignment(size_t port) = 0;
 
@@ -90,10 +93,11 @@ class Source {
    * Populates the given Buffers. This method may or may not do some processing.
    * For Sinks, processing may also be done in Sink::commitBuffer().
    *
-   * However, this method can avoid a memcpy, because an internal buffer isn't
+   * However, this method can avoid a memcpy, because an internal mInputBuffer isn't
    * needed to store the processed results.
    */
-  virtual void readOutput(Buffer* portOutputs, size_t portOutputCount) = 0;
+  virtual void readOutput(
+      const std::vector<std::shared_ptr<Buffer>>& portOutputs) = 0;
 };
 
 class Filter : public Sink, public Source {

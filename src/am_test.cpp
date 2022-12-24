@@ -26,6 +26,7 @@
 #include "S8ToFloat.h"
 #include "cuda_util.h"
 #include "fir.h"
+#include "remez.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -66,41 +67,50 @@ int main(int argc, char** argv) {
 
   const float gain = 1.0f;
 
-  std::vector<float> lowPassTaps = generateLowPassTaps(
-      gain,
-      rfSampleRate,
-      cutoffFrequency,
-      transitionWidth);
+  std::vector<float> lowPassTaps =
+      generateLowPassTaps(gain, rfSampleRate, cutoffFrequency, transitionWidth);
 
   FirCcf lowPassFilter(decimation, lowPassTaps, cudaDevice, cudaStream);
   Magnitude magnitude(cudaDevice, cudaStream);
   AddConst centerAtZero(-1.0f, cudaDevice, cudaStream);
 
+  int8_t* hackrfHostSamples = nullptr;
   hackrfSource.setSampleCallback(
-      [&convertHackrfInputToFloat,
+      [&hackrfHostSamples,
+       &convertHackrfInputToFloat,
        &cosineSource,
        &multiplyRfSourceByCosine](const int8_t* samples, size_t byteCount) {
         const size_t hackRfInputSampleCount =
             byteCount / 2;  // samples alternates between real and imaginary
-        Buffer s8ToFloatInput =
+        shared_ptr<Buffer> s8ToFloatInputCudaBuffer =
             convertHackrfInputToFloat.requestBuffer(0, byteCount);
-        if (s8ToFloatInput.remaining() < byteCount) {
+        if (s8ToFloatInputCudaBuffer->remaining() < byteCount) {
           printf("Dropped\n");
         }
 
-        size_t copyByteCount = min(byteCount, s8ToFloatInput.remaining());
-        memcpy(s8ToFloatInput.writePtr<int8_t>(), samples, copyByteCount);
+        size_t copyByteCount =
+            min(byteCount, s8ToFloatInputCudaBuffer->remaining());
+        memmove(hackrfHostSamples, samples, copyByteCount);
+        cudaMemcpyAsync(
+            s8ToFloatInputCudaBuffer->writePtr<int8_t>(),
+            hackrfHostSamples,
+            copyByteCount,
+            cudaMemcpyHostToDevice);
+        memmove(
+            s8ToFloatInputCudaBuffer->writePtr<int8_t>(),
+            samples,
+            copyByteCount);
         convertHackrfInputToFloat.commitBuffer(0, copyByteCount);
 
         const size_t multiplyInputCount =
             hackRfInputSampleCount * sizeof(cuComplex);
-        Buffer rfMultiplyInput =
+        shared_ptr<Buffer> rfMultiplyInput =
             multiplyRfSourceByCosine.requestBuffer(0, multiplyInputCount);
-        Buffer cosineMultiplyInput =
+        shared_ptr<Buffer> cosineMultiplyInput =
             multiplyRfSourceByCosine.requestBuffer(1, multiplyInputCount);
 
         size_t multiplyInputSampleCount =
-            min(rfMultiplyInput.remaining() / sizeof(cuComplex),
-                cosineMultiplyInput.remaining() / sizeof(cuComplex));
+            min(rfMultiplyInput->remaining() / sizeof(cuComplex),
+                cosineMultiplyInput->remaining() / sizeof(cuComplex));
       });
 }

@@ -22,26 +22,82 @@
 #include "Buffer.h"
 
 /**
- * Creates an aligned buffer, and causes a GPU sync when allocating, and another
- * when the returned buffer is freed.
+ * Creates an aligned mInputBuffer, and causes a GPU sync when allocating, and
+ * another when the returned mInputBuffer is freed.
  *
- * @param elementCount The number of elements in the returned buffer.
+ * @param elementCount The number of elements in the returned mInputBuffer.
  */
-OwnedBuffer createAlignedBuffer(
+std::shared_ptr<Buffer> createAlignedBufferCuda(
     size_t bufferSize,
     size_t sizeAlignment,
-    cudaStream_t cudaStream = nullptr);
+    cudaStream_t cudaStream);
 
 /**
- * Creates an aligned buffer, and causes a GPU sync when allocating, and another
- * when the returned buffer is freed.
+ * Creates an aligned mInputBuffer, and causes a GPU sync when allocating, and
+ * another when the returned mInputBuffer is freed.
  *
- * @param elementCount The number of elements in the returned buffer.
+ * @param elementCount The number of elements in the returned mInputBuffer.
  */
-void ensureMinCapacityAligned(
-    OwnedBuffer* buffer,
+void ensureMinCapacityAlignedCuda(
+    std::shared_ptr<Buffer>* buffer,
     size_t minSize,
     size_t alignment,
-    cudaStream_t cudaStream = nullptr);
+    cudaStream_t cudaStream);
 
+void appendToBufferCuda(
+    Buffer* buffer,
+    const void* src,
+    size_t count,
+    cudaStream_t cudaStream,
+    cudaMemcpyKind memcpyKind);
+
+/**
+ * Removes [count] bytes from the beginning of [src] and copies into dst.
+ *
+ * [src.offset] is increased by [count].
+ *
+ * If count exceeds the remaining capacity of [dst], or the available byte count in
+ * [src], this method will throw an exception.
+ */
+void readFromBufferCuda(
+    void* dst,
+    Buffer* buffer,
+    size_t count,
+    cudaStream_t cudaStream);
+
+/**
+ * Removes [count] bytes from the beginning of [src] and appends to [dst].
+ *
+ * [src.offset] is increased, and [dst.endOffset] is decreased by [count].
+ *
+ * If count exceeds the remaining capacity of [dst], or the available byte count in
+ * [src], this method will throw an exception.
+ */
+void moveFromBufferCuda(
+    Buffer* dst,
+    Buffer* src,
+    size_t count,
+    cudaStream_t cudaStream,
+    cudaMemcpyKind kind);
+
+/**
+ * Allocates pinned memory for faster (and async) cuda memcopies
+ */
+std::shared_ptr<Buffer> createAlignedBufferCudaHost(
+    size_t bufferSize,
+    size_t sizeAlignment);
+
+/**
+ * When buffer->get() is null or its capacity is less than minSize,
+ * a new buffer with pinned host memory is allocated.
+ *
+ * If buffer->get() is not null, the data in it's 'used' range will be copied
+ * to the beginning of the new buffer, which is assigned to *buffer.
+ */
+void ensureMinCapacityAlignedCudaHost(
+    std::shared_ptr<Buffer>* buffer,
+    size_t minSize,
+    size_t alignment);
+
+void moveUsedToStartCuda(Buffer* buffer, cudaStream_t cudaStream);
 #endif  // SDRTEST_SRC_CUDABUFFERS_H_
