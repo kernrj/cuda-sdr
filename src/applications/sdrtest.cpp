@@ -30,7 +30,7 @@
 #include <stack>
 #include <thread>
 
-#include "../fm.h"
+#include "fm.h"
 #include "../prototype/fm_pipeline.h"
 
 using namespace std;
