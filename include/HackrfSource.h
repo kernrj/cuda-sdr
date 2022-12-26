@@ -38,8 +38,7 @@ class HackrfSource {
   void start();
   void stop();
 
-  void setSampleCallback(
-      std::function<void(const int8_t* data, size_t dataLength)>&& sampleCallback);
+  void setSampleCallback(std::function<void(const int8_t* data, size_t dataLength)>&& sampleCallback);
 
  private:
   HackrfSession mHackrfSession;

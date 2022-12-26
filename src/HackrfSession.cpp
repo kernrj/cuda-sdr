@@ -23,16 +23,15 @@
 
 using namespace std;
 
-#define SAFE_HRF(__cmd, __errorMsg)                                     \
-  do {                                                                  \
-    int status = (__cmd);                                               \
-    if (status != HACKRF_SUCCESS) {                                     \
-      ostringstream msgStream;                                          \
-      msgStream << (__errorMsg) << " - Error " << status << "("         \
-                << hackrf_error_name(static_cast<hackrf_error>(status)) \
-                << ")";                                                 \
-      throw runtime_error(msgStream.str());                             \
-    }                                                                   \
+#define SAFE_HRF(__cmd, __errorMsg)                                             \
+  do {                                                                          \
+    int status = (__cmd);                                                       \
+    if (status != HACKRF_SUCCESS) {                                             \
+      ostringstream msgStream;                                                  \
+      msgStream << (__errorMsg) << " - Error " << status << "("                 \
+                << hackrf_error_name(static_cast<hackrf_error>(status)) << ")"; \
+      throw runtime_error(msgStream.str());                                     \
+    }                                                                           \
   } while (false)
 
 static mutex sessionLock;

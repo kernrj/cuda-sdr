@@ -35,9 +35,7 @@ class Sink {
    * The returned Buffer's mCapacity may be larger than byteCount. Any extra
    * mCapacity can be freely used.
    */
-  [[nodiscard]] virtual std::shared_ptr<Buffer> requestBuffer(
-      size_t port,
-      size_t byteCount) = 0;
+  [[nodiscard]] virtual std::shared_ptr<Buffer> requestBuffer(size_t port, size_t byteCount) = 0;
 
   /**
    * Commits the mInputBuffer, and specifies the number of bytes actually consumed.
@@ -96,8 +94,7 @@ class Source {
    * However, this method can avoid a memcpy, because an internal mInputBuffer isn't
    * needed to store the processed results.
    */
-  virtual void readOutput(
-      const std::vector<std::shared_ptr<Buffer>>& portOutputs) = 0;
+  virtual void readOutput(const std::vector<std::shared_ptr<Buffer>>& portOutputs) = 0;
 };
 
 class Filter : public Sink, public Source {

@@ -108,10 +108,7 @@ std::string remezStatusToString(RemezStatus status) {
    * For differentiator, hilbert,
    *   symmetry is odd and Grid[0] = max(delf, bands[0])
    */
-  const double grid0 =
-      ((symmetry == NEGATIVE) && (delf > bands[0].lowFrequency))
-          ? delf
-          : bands[0].lowFrequency;
+  const double grid0 = ((symmetry == NEGATIVE) && (delf > bands[0].lowFrequency)) ? delf : bands[0].lowFrequency;
 
   for (size_t j = 0, bandIndex = 0; bandIndex < bands.size(); bandIndex++) {
     const Band& band = bands[bandIndex];
@@ -122,8 +119,7 @@ std::string remezStatusToString(RemezStatus status) {
     for (size_t i = 0; i < k; i++) {
       if (j < Grid.size()) {
         D[j] = band.lowFrequencyResponse
-               + static_cast<double>(i)
-                     * (band.highFrequencyResponse - band.lowFrequencyResponse)
+               + static_cast<double>(i) * (band.highFrequencyResponse - band.lowFrequencyResponse)
                      / static_cast<double>(k - 1);
         W[j] = band.weight;
         Grid[j] = lowf;
@@ -145,8 +141,7 @@ std::string remezStatusToString(RemezStatus status) {
    * Similar to above, if odd symmetry, last grid point can't be .5
    *  - but, if there are even taps, leave the last grid point at .5
    */
-  if ((symmetry == NEGATIVE) && (Grid[Grid.size() - 1] > (0.5 - delf))
-      && (numtaps % 2)) {
+  if ((symmetry == NEGATIVE) && (Grid[Grid.size() - 1] > (0.5 - delf)) && (numtaps % 2)) {
     Grid[Grid.size() - 1] = 0.5 - delf;
   }
 
@@ -169,9 +164,7 @@ std::string remezStatusToString(RemezStatus status) {
  * size_t Ext[]    - Extremal indexes to dense frequency grid [r+1]
  ********************/
 
-[[nodiscard]] static RemezStatus InitialGuess(
-    vector<size_t>& Ext,
-    size_t gridsize) {
+[[nodiscard]] static RemezStatus InitialGuess(vector<size_t>& Ext, size_t gridsize) {
   if (gridsize == 0) {
     return InvalidParameter;
   }
@@ -210,8 +203,7 @@ std::string remezStatusToString(RemezStatus status) {
     vector<double>& ad,
     vector<double>& x,
     vector<double>& y) {
-  if (Ext.size() != ad.size() || Ext.size() != x.size()
-      || Ext.size() != y.size()) {
+  if (Ext.size() != ad.size() || Ext.size() != x.size() || Ext.size() != y.size()) {
     return InvalidParameter;
   }
 
@@ -289,12 +281,8 @@ std::string remezStatusToString(RemezStatus status) {
  * Returns double value of A[freq]
  *********************/
 
-[[nodiscard]] static RemezStatus ComputeA(
-    double freq,
-    const vector<double>& ad,
-    const vector<double>& x,
-    const vector<double>& y,
-    double* outA) {
+[[nodiscard]] static RemezStatus
+ComputeA(double freq, const vector<double>& ad, const vector<double>& x, const vector<double>& y, double* outA) {
   const size_t r = ad.size() - 1;
 
   if (ad.size() != x.size() || ad.size() != y.size() || outA == nullptr) {
@@ -355,8 +343,7 @@ std::string remezStatusToString(RemezStatus status) {
     return InvalidParameter;
   }
 
-  if (Grid.size() != D.size() || Grid.size() != W.size()
-      || Grid.size() != E.size()) {
+  if (Grid.size() != D.size() || Grid.size() != W.size() || Grid.size() != E.size()) {
     return InvalidParameter;
   }
 
@@ -400,15 +387,12 @@ std::string remezStatusToString(RemezStatus status) {
  * -------
  * size_t    Ext[]    - New indexes to extremal frequencies [r+1]
  ************************/
-[[nodiscard]] static RemezStatus Search(
-    vector<size_t>& Ext,
-    vector<double>& E) {
+[[nodiscard]] static RemezStatus Search(vector<size_t>& Ext, vector<double>& E) {
   const size_t gridsize = E.size();
   const size_t r = Ext.size() - 1;
   // size_t up, alt;
-  const size_t foundExtSize = gridsize; // originally 2r
+  const size_t foundExtSize = gridsize;  // originally 2r
   vector<size_t> foundExt(foundExtSize); /* Array of found extremals */
-
 
   /*
    * Allocate enough space for found extremals.
@@ -418,8 +402,7 @@ std::string remezStatusToString(RemezStatus status) {
   /*
    * Check for extremum at 0.
    */
-  if (((E[0] > 0.0) && (E[0] > E[1])) || ((E[0] < 0.0) && (E[0] < E[1])))
-    foundExt[k++] = 0;
+  if (((E[0] > 0.0) && (E[0] > E[1])) || ((E[0] < 0.0) && (E[0] < E[1]))) foundExt[k++] = 0;
 
   /*
    * Check for extrema inside dense grid
@@ -440,8 +423,7 @@ std::string remezStatusToString(RemezStatus status) {
    */
   const size_t lastGridIndex = gridsize - 1;
   if (((E[lastGridIndex] > 0.0) && (E[lastGridIndex] > E[lastGridIndex - 1]))
-      || ((E[lastGridIndex] < 0.0)
-          && (E[lastGridIndex] < E[lastGridIndex - 1]))) {
+      || ((E[lastGridIndex] < 0.0) && (E[lastGridIndex] < E[lastGridIndex - 1]))) {
     if (k >= foundExtSize) {
       return TooManyExtremalFrequencies;
     }
@@ -471,8 +453,7 @@ std::string remezStatusToString(RemezStatus status) {
     size_t l = 0;
     size_t alt = 1;
     for (size_t j = 1; j < k; j++) {
-      if (fabs(E[foundExt[j]]) < fabs(E[foundExt[l]]))
-        l = j; /* new smallest error. */
+      if (fabs(E[foundExt[j]]) < fabs(E[foundExt[l]])) l = j; /* new smallest error. */
       if ((up) && (E[foundExt[j]] < 0.0))
         up = 0; /* switch to a minima */
       else if ((!up) && (E[foundExt[j]] > 0.0))
@@ -494,8 +475,7 @@ std::string remezStatusToString(RemezStatus status) {
      * delete the smallest of the first/last extremals.
      */
     if ((alt) && (extra == 1)) {
-      if (fabs(E[foundExt[k - 1]]) < fabs(E[foundExt[0]]))
-        /* Delete last extremal */
+      if (fabs(E[foundExt[k - 1]]) < fabs(E[foundExt[0]])) /* Delete last extremal */
         l = k - 1;
       // PAK: changed from l = foundExt[k-1];
       else
@@ -537,10 +517,7 @@ std::string remezStatusToString(RemezStatus status) {
  * -------
  * double outTaps[] - Impulse Response of final filter [N]
  *********************/
-[[nodiscard]] static RemezStatus FreqSample(
-    const vector<double>& A,
-    vector<double>& outTaps,
-    Symmetry symmetry) {
+[[nodiscard]] static RemezStatus FreqSample(const vector<double>& A, vector<double>& outTaps, Symmetry symmetry) {
   const uint32_t N = A.size();
 
   if (N == 0) {
@@ -611,9 +588,7 @@ std::string remezStatusToString(RemezStatus status) {
  * Returns 0 if the result has not converged
  ********************/
 
-[[nodiscard]] static bool isDone(
-    const vector<size_t>& Ext,
-    const vector<double>& E) {
+[[nodiscard]] static bool isDone(const vector<size_t>& Ext, const vector<double>& E) {
   const size_t r = Ext.size() - 1;
   double min, max, current;
 
@@ -655,8 +630,7 @@ RemezStatus remezNew(
     FilterType type,
     size_t griddensity,
     size_t maxIterations) {
-  if (outTaps.empty() || bands.empty() || griddensity <= 0
-      || maxIterations <= 0) {
+  if (outTaps.empty() || bands.empty() || griddensity <= 0 || maxIterations <= 0) {
     return InvalidParameter;
   }
 
@@ -675,9 +649,7 @@ RemezStatus remezNew(
    */
   size_t gridsize = 0;
   for (const auto& band : bands) {
-    gridsize += lrint(
-        static_cast<double>(2 * r * griddensity)
-        * (band.highFrequency - band.lowFrequency));
+    gridsize += lrint(static_cast<double>(2 * r * griddensity) * (band.highFrequency - band.lowFrequency));
   }
   if (symmetry == NEGATIVE) {
     gridsize--;
@@ -699,15 +671,7 @@ RemezStatus remezNew(
   /*
    * Create dense frequency grid
    */
-  RemezStatus status = CreateDenseGrid(
-      r,
-      outTaps.size(),
-      bands,
-      Grid,
-      D,
-      W,
-      symmetry,
-      griddensity);
+  RemezStatus status = CreateDenseGrid(r, outTaps.size(), bands, Grid, D, W, symmetry, griddensity);
   if (status != Ok) {
     return status;
   }

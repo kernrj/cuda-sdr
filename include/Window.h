@@ -5,8 +5,8 @@
 #ifndef SDRTEST_SRC_WINDOW_H_
 #define SDRTEST_SRC_WINDOW_H_
 
-#include <vector>
 #include <cstddef>
+#include <vector>
 
 std::vector<float> createHammingWindow(size_t length);
 

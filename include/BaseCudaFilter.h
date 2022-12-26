@@ -5,8 +5,6 @@
 #ifndef GPUSDR_SRC_BASECUDAFILTER_H_
 #define GPUSDR_SRC_BASECUDAFILTER_H_
 
-class BaseCudaFilter {
+class BaseCudaFilter {};
 
-};
-
-#endif //GPUSDR_SRC_BASECUDAFILTER_H_
+#endif  // GPUSDR_SRC_BASECUDAFILTER_H_

@@ -28,38 +28,33 @@
  * it doesn't have a declaration for this function. The error is cosmetic
  * because it compiles fine, but it's distracting.
  */
-extern cudaError_t cudaConfigureCall(
-    dim3 gridDim,
-    dim3 blockDim,
-    size_t sharedMem = 0,
-    cudaStream_t stream = nullptr);
+extern cudaError_t cudaConfigureCall(dim3 gridDim, dim3 blockDim, size_t sharedMem = 0, cudaStream_t stream = nullptr);
 
-inline void checkCuda(const char *msg) {
-    cudaError_t status = cudaDeviceSynchronize();
-    if (status != cudaSuccess) {
-        const char *errName = cudaGetErrorName(status);
-        fprintf(stderr, "%s: %s (%d).\n", msg, errName, status);
-        throw std::runtime_error(std::string(msg) + ": " + errName + " (" + std::to_string(status) + ").");
-    }
+inline void checkCuda(const char* msg) {
+  cudaError_t status = cudaDeviceSynchronize();
+  if (status != cudaSuccess) {
+    const char* errName = cudaGetErrorName(status);
+    fprintf(stderr, "%s: %s (%d).\n", msg, errName, status);
+    throw std::runtime_error(std::string(msg) + ": " + errName + " (" + std::to_string(status) + ").");
+  }
 }
 
-#define SAFE_CUDA(__cmd)                                                 \
-  do {                                                                   \
-    checkCuda("Before: " #__cmd);                                        \
-    cudaError_t __status = (__cmd);                                      \
-    if (__status != cudaSuccess) {                                       \
-      throw std::runtime_error(                                          \
-          std::string("CUDA error ") + cudaGetErrorName(__status) + ": " \
-          + cudaGetErrorString(__status) + ". At " + __FILE__ + ":"      \
-          + std::to_string(__LINE__));                                   \
-    }                                                                    \
+#define SAFE_CUDA(__cmd)                                                                                          \
+  do {                                                                                                            \
+    checkCuda("Before: " #__cmd);                                                                                 \
+    cudaError_t __status = (__cmd);                                                                               \
+    if (__status != cudaSuccess) {                                                                                \
+      throw std::runtime_error(                                                                                   \
+          std::string("CUDA error ") + cudaGetErrorName(__status) + ": " + cudaGetErrorString(__status) + ". At " \
+          + __FILE__ + ":" + std::to_string(__LINE__));                                                           \
+    }                                                                                                             \
   } while (false)
 
 inline int32_t getCurrentCudaDevice() {
-    int32_t device = -1;
-    SAFE_CUDA(cudaGetDevice(&device));
+  int32_t device = -1;
+  SAFE_CUDA(cudaGetDevice(&device));
 
-    return device;
+  return device;
 }
 
 #endif  // SDRTEST_SRC_CUDA_UTIL_H_

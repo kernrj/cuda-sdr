@@ -35,8 +35,7 @@ __global__ void k_Magnitude(const cuComplex* in, float* out) {
 }
 
 Magnitude::Magnitude(int32_t cudaDevice, cudaStream_t cudaStream)
-    : mCudaDevice(cudaDevice), mCudaStream(cudaStream),
-      mBufferCheckedOut(false) {}
+    : mCudaDevice(cudaDevice), mCudaStream(cudaStream), mBufferCheckedOut(false) {}
 
 shared_ptr<Buffer> Magnitude::requestBuffer(size_t port, size_t numBytes) {
   if (port >= 1) {
@@ -48,11 +47,7 @@ shared_ptr<Buffer> Magnitude::requestBuffer(size_t port, size_t numBytes) {
   }
 
   CudaDevicePushPop setAndRestore(mCudaDevice);
-  ensureMinCapacityAlignedCuda(
-      &mInputBuffer,
-      numBytes,
-      mAlignment * sizeof(cuComplex),
-      mCudaStream);
+  ensureMinCapacityAlignedCuda(&mInputBuffer, numBytes, mAlignment * sizeof(cuComplex), mCudaStream);
 
   return mInputBuffer->sliceRemaining();
 }
@@ -70,17 +65,11 @@ void Magnitude::commitBuffer(size_t port, size_t numBytes) {
   mBufferCheckedOut = false;
 }
 
-size_t Magnitude::getOutputDataSize(size_t port) {
-  return getAvailableNumInputElements() * sizeof(float);
-}
+size_t Magnitude::getOutputDataSize(size_t port) { return getAvailableNumInputElements() * sizeof(float); }
 
-size_t Magnitude::getAvailableNumInputElements() const {
-  return mInputBuffer->used() / sizeof(cuComplex);
-}
+size_t Magnitude::getAvailableNumInputElements() const { return mInputBuffer->used() / sizeof(cuComplex); }
 
-size_t Magnitude::getOutputSizeAlignment(size_t port) {
-  return mAlignment * sizeof(float);
-}
+size_t Magnitude::getOutputSizeAlignment(size_t port) { return mAlignment * sizeof(float); }
 
 void Magnitude::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
   if (portOutputs.empty()) {
@@ -93,8 +82,7 @@ void Magnitude::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
   const auto& outputBuffer = portOutputs[0];
   const size_t maxNumOutputElements = outputBuffer->remaining() / sizeof(float);
 
-  const size_t maxUnalignedNumElementsToProcess =
-      min(numInputElements, maxNumOutputElements);
+  const size_t maxUnalignedNumElementsToProcess = min(numInputElements, maxNumOutputElements);
 
   const size_t numBlocks = maxUnalignedNumElementsToProcess / mAlignment;
   const size_t processNumInputElements = numBlocks * mAlignment;

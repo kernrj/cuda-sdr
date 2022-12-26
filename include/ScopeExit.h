@@ -21,8 +21,7 @@
 
 class ScopeExit {
  public:
-  ScopeExit(std::function<void()>&& doAtScopeExit)
-      : mDoAtScopeExit(std::move(doAtScopeExit)) {}
+  ScopeExit(std::function<void()>&& doAtScopeExit) : mDoAtScopeExit(std::move(doAtScopeExit)) {}
 
   ~ScopeExit() {
     if (mDoAtScopeExit) {

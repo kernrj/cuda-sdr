@@ -14,17 +14,15 @@
  *  limitations under the License.
  */
 
-#include "QuadDemod.h"
-
 #include <cuComplex.h>
 
+#include "QuadDemod.h"
 #include "cuComplexOperatorOverloads.cuh"
 
-__global__ static void k_quadDemod(const cuComplex *input, float *output, float gain) {
-    uint32_t index = blockDim.x * blockIdx.x + threadIdx.x;
+__global__ static void k_quadDemod(const cuComplex* input, float* output, float gain) {
+  uint32_t index = blockDim.x * blockIdx.x + threadIdx.x;
 
-    const cuComplex m = input[index + 1] * cuConjf(input[index]);
+  const cuComplex m = input[index + 1] * cuConjf(input[index]);
 
-    output[index] = gain * atan2f(m.y, m.x);
+  output[index] = gain * atan2f(m.y, m.x);
 }
-

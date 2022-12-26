@@ -43,8 +43,7 @@ __global__ void k_int8ToFloat(const int8_t* input, float* output) {
 }
 
 CudaInt8ToFloat::CudaInt8ToFloat(int32_t cudaDevice, cudaStream_t cudaStream)
-    : mCudaDevice(cudaDevice), mCudaStream(cudaStream),
-      mBufferCheckedOut(false) {}
+    : mCudaDevice(cudaDevice), mCudaStream(cudaStream), mBufferCheckedOut(false) {}
 
 shared_ptr<Buffer> CudaInt8ToFloat::requestBuffer(size_t port, size_t numBytes) {
   if (port > 0) {
@@ -57,11 +56,7 @@ shared_ptr<Buffer> CudaInt8ToFloat::requestBuffer(size_t port, size_t numBytes) 
 
   CudaDevicePushPop setAndRestore(mCudaDevice);
 
-  ensureMinCapacityAlignedCuda(
-      &mInputBuffer,
-      numBytes,
-      mAlignment * sizeof(uint8_t),
-      mCudaStream);
+  ensureMinCapacityAlignedCuda(&mInputBuffer, numBytes, mAlignment * sizeof(uint8_t), mCudaStream);
 
   mBufferCheckedOut = true;
   return mInputBuffer->sliceRemaining();
@@ -84,12 +79,9 @@ size_t CudaInt8ToFloat::getOutputDataSize(size_t port) {
   return mInputBuffer->used();
 }
 
-size_t CudaInt8ToFloat::getOutputSizeAlignment(size_t port) {
-  return mAlignment;
-}
+size_t CudaInt8ToFloat::getOutputSizeAlignment(size_t port) { return mAlignment; }
 
-void CudaInt8ToFloat::readOutput(
-    const vector<shared_ptr<Buffer>>& portOutputs) {
+void CudaInt8ToFloat::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
   if (portOutputs.empty()) {
     throw invalid_argument("One output port is required");
   }
@@ -98,14 +90,11 @@ void CudaInt8ToFloat::readOutput(
 
   const auto& outputBuffer = portOutputs[0];
 
-  const size_t elementCount =
-      min(mInputBuffer->used(), outputBuffer->remaining() / sizeof(float));
+  const size_t elementCount = min(mInputBuffer->used(), outputBuffer->remaining() / sizeof(float));
   dim3 blocks = dim3((elementCount + mAlignment - 1) / mAlignment);
   dim3 threads = dim3(mAlignment);
 
-  k_int8ToFloat<<<blocks, threads, 0, mCudaStream>>>(
-      mInputBuffer->readPtr<int8_t>(),
-      outputBuffer->writePtr<float>());
+  k_int8ToFloat<<<blocks, threads, 0, mCudaStream>>>(mInputBuffer->readPtr<int8_t>(), outputBuffer->writePtr<float>());
 
   outputBuffer->increaseEndOffset(elementCount * sizeof(float));
   mInputBuffer->increaseOffset(elementCount * sizeof(int8_t));

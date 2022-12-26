@@ -25,8 +25,7 @@
 
 class CudaDevicePushPop {
  public:
-  explicit CudaDevicePushPop(int32_t cudaDevice)
-      : mPreviousCudaDevice(getCurrentCudaDevice()) {
+  explicit CudaDevicePushPop(int32_t cudaDevice) : mPreviousCudaDevice(getCurrentCudaDevice()) {
     SAFE_CUDA(cudaSetDevice(cudaDevice));
   }
 

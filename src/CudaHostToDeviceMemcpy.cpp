@@ -13,15 +13,10 @@
 
 using namespace std;
 
-CudaHostToDeviceMemcpy::CudaHostToDeviceMemcpy(
-    int32_t cudaDevice,
-    cudaStream_t cudaStream)
-    : mCudaDevice(cudaDevice), mCudaStream(cudaStream),
-      mBufferCheckedOut(false) {}
+CudaHostToDeviceMemcpy::CudaHostToDeviceMemcpy(int32_t cudaDevice, cudaStream_t cudaStream)
+    : mCudaDevice(cudaDevice), mCudaStream(cudaStream), mBufferCheckedOut(false) {}
 
-shared_ptr<Buffer> CudaHostToDeviceMemcpy::requestBuffer(
-    size_t port,
-    size_t numBytes) {
+shared_ptr<Buffer> CudaHostToDeviceMemcpy::requestBuffer(size_t port, size_t numBytes) {
   if (port >= 1) {
     throw runtime_error("Port [" + to_string(port) + "] is out of range");
   }
@@ -49,14 +44,11 @@ void CudaHostToDeviceMemcpy::commitBuffer(size_t port, size_t numBytes) {
   mBufferCheckedOut = false;
 }
 
-size_t CudaHostToDeviceMemcpy::getOutputDataSize(size_t port) {
-  return mInputBuffer->used();
-}
+size_t CudaHostToDeviceMemcpy::getOutputDataSize(size_t port) { return mInputBuffer->used(); }
 
 size_t CudaHostToDeviceMemcpy::getOutputSizeAlignment(size_t port) { return 1; }
 
-void CudaHostToDeviceMemcpy::readOutput(
-    const vector<shared_ptr<Buffer>>& portOutputs) {
+void CudaHostToDeviceMemcpy::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
   if (portOutputs.empty()) {
     throw runtime_error("One output port is required");
   }
@@ -64,12 +56,7 @@ void CudaHostToDeviceMemcpy::readOutput(
   const auto& outBuffer = portOutputs[0];
   size_t copyNumBytes = min(outBuffer->remaining(), mInputBuffer->used());
 
-  moveFromBufferCuda(
-      outBuffer.get(),
-      mInputBuffer.get(),
-      copyNumBytes,
-      mCudaStream,
-      cudaMemcpyHostToDevice);
+  moveFromBufferCuda(outBuffer.get(), mInputBuffer.get(), copyNumBytes, mCudaStream, cudaMemcpyHostToDevice);
 
   moveUsedToStart(mInputBuffer.get());
 }

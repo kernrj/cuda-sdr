@@ -27,8 +27,7 @@ using namespace std;
 
 const size_t AddConstToVectorLength::mAlignment = 32;
 
-__global__ void
-k_AddToAmplitude(const cuComplex* in, float addToAmplitude, cuComplex* out) {
+__global__ void k_AddToAmplitude(const cuComplex* in, float addToAmplitude, cuComplex* out) {
   const size_t x = blockDim.x * blockIdx.x + threadIdx.x;
 
   const cuComplex inputValue = in[x];
@@ -39,16 +38,11 @@ k_AddToAmplitude(const cuComplex* in, float addToAmplitude, cuComplex* out) {
   out[x] = newLength * normVec;
 }
 
-AddConstToVectorLength::AddConstToVectorLength(
-    float addValueToAmplitude,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream)
-    : mAddValueToAmplitude(addValueToAmplitude), mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream), mBufferCheckedOut(false) {}
+AddConstToVectorLength::AddConstToVectorLength(float addValueToAmplitude, int32_t cudaDevice, cudaStream_t cudaStream)
+    : mAddValueToAmplitude(addValueToAmplitude), mCudaDevice(cudaDevice), mCudaStream(cudaStream),
+      mBufferCheckedOut(false) {}
 
-shared_ptr<Buffer> AddConstToVectorLength::requestBuffer(
-    size_t port,
-    size_t numBytes) {
+shared_ptr<Buffer> AddConstToVectorLength::requestBuffer(size_t port, size_t numBytes) {
   if (port >= 1) {
     throw runtime_error("Port [" + to_string(port) + "] is out of range");
   }
@@ -58,11 +52,7 @@ shared_ptr<Buffer> AddConstToVectorLength::requestBuffer(
   }
 
   CudaDevicePushPop setAndRestore(mCudaDevice);
-  ensureMinCapacityAlignedCuda(
-      &mInputBuffer,
-      numBytes,
-      mAlignment * sizeof(cuComplex),
-      mCudaStream);
+  ensureMinCapacityAlignedCuda(&mInputBuffer, numBytes, mAlignment * sizeof(cuComplex), mCudaStream);
 
   return mInputBuffer->sliceRemaining();
 }
@@ -84,16 +74,11 @@ size_t AddConstToVectorLength::getOutputDataSize(size_t port) {
   return getAvailableNumInputElements() * sizeof(cuComplex);
 }
 
-size_t AddConstToVectorLength::getAvailableNumInputElements() const {
-  return mInputBuffer->used() / sizeof(cuComplex);
-}
+size_t AddConstToVectorLength::getAvailableNumInputElements() const { return mInputBuffer->used() / sizeof(cuComplex); }
 
-size_t AddConstToVectorLength::getOutputSizeAlignment(size_t port) {
-  return mAlignment * sizeof(cuComplex);
-}
+size_t AddConstToVectorLength::getOutputSizeAlignment(size_t port) { return mAlignment * sizeof(cuComplex); }
 
-void AddConstToVectorLength::readOutput(
-    const vector<shared_ptr<Buffer>>& portOutputs) {
+void AddConstToVectorLength::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
   if (portOutputs.empty()) {
     throw runtime_error("One output port is required");
   }
@@ -102,11 +87,9 @@ void AddConstToVectorLength::readOutput(
 
   const size_t numInputElements = getAvailableNumInputElements();
   const auto& outputBuffer = portOutputs[0];
-  const size_t maxNumOutputElements =
-      outputBuffer->remaining() / sizeof(cuComplex);
+  const size_t maxNumOutputElements = outputBuffer->remaining() / sizeof(cuComplex);
 
-  const size_t maxUnalignedNumElementsToProcess =
-      min(numInputElements, maxNumOutputElements);
+  const size_t maxUnalignedNumElementsToProcess = min(numInputElements, maxNumOutputElements);
 
   const size_t numBlocks = maxUnalignedNumElementsToProcess / mAlignment;
   const size_t processNumInputElements = numBlocks * mAlignment;

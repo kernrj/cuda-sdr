@@ -22,17 +22,12 @@
 
 class CosineSource : public Source {
  public:
-  CosineSource(
-      float sampleRate,
-      float frequency,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream);
+  CosineSource(float sampleRate, float frequency, int32_t cudaDevice, cudaStream_t cudaStream);
   ~CosineSource() override = default;
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) override;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(
-      const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
+  void readOutput(const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
 
  private:
   float mSampleRate;

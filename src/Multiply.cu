@@ -35,8 +35,7 @@ __global__ void k_Multiply(const IN1_T* in1, const IN2_T* in2, OUT_T* out) {
 }
 
 MultiplyCcc::MultiplyCcc(int32_t cudaDevice, cudaStream_t cudaStream)
-    : mInputBuffers(2), mCudaDevice(cudaDevice), mCudaStream(cudaStream),
-      mBufferCheckedOut(false) {}
+    : mInputBuffers(2), mCudaDevice(cudaDevice), mCudaStream(cudaStream), mBufferCheckedOut(false) {}
 
 shared_ptr<Buffer> MultiplyCcc::requestBuffer(size_t port, size_t numBytes) {
   if (port >= mInputBuffers.size()) {
@@ -48,11 +47,7 @@ shared_ptr<Buffer> MultiplyCcc::requestBuffer(size_t port, size_t numBytes) {
   }
 
   CudaDevicePushPop setAndRestore(mCudaDevice);
-  ensureMinCapacityAlignedCuda(
-      &mInputBuffers[port],
-      numBytes,
-      mAlignment * sizeof(cuComplex),
-      mCudaStream);
+  ensureMinCapacityAlignedCuda(&mInputBuffers[port], numBytes, mAlignment * sizeof(cuComplex), mCudaStream);
 
   return mInputBuffers[port]->sliceRemaining();
 }
@@ -70,9 +65,7 @@ void MultiplyCcc::commitBuffer(size_t port, size_t numBytes) {
   mBufferCheckedOut = false;
 }
 
-size_t MultiplyCcc::getOutputDataSize(size_t port) {
-  return getAvailableNumInputElements() * sizeof(cuComplex);
-}
+size_t MultiplyCcc::getOutputDataSize(size_t port) { return getAvailableNumInputElements() * sizeof(cuComplex); }
 
 size_t MultiplyCcc::getAvailableNumInputElements() const {
   const size_t port0NumElements = mInputBuffers[0]->used() / sizeof(cuComplex);
@@ -82,9 +75,7 @@ size_t MultiplyCcc::getAvailableNumInputElements() const {
   return numInputElements;
 }
 
-size_t MultiplyCcc::getOutputSizeAlignment(size_t port) {
-  return mAlignment * sizeof(cuComplex);
-}
+size_t MultiplyCcc::getOutputSizeAlignment(size_t port) { return mAlignment * sizeof(cuComplex); }
 
 void MultiplyCcc::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
   if (portOutputs.empty()) {
@@ -95,11 +86,9 @@ void MultiplyCcc::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
 
   const size_t numInputElements = getAvailableNumInputElements();
   const auto& outputBuffer = portOutputs[0];
-  const size_t maxNumOutputElements =
-      outputBuffer->remaining() / sizeof(cuComplex);
+  const size_t maxNumOutputElements = outputBuffer->remaining() / sizeof(cuComplex);
 
-  const size_t maxUnalignedNumElementsToProcess =
-      min(numInputElements, maxNumOutputElements);
+  const size_t maxUnalignedNumElementsToProcess = min(numInputElements, maxNumOutputElements);
 
   const size_t numBlocks = maxUnalignedNumElementsToProcess / mAlignment;
   const size_t processNumInputElements = numBlocks * mAlignment;
@@ -107,11 +96,10 @@ void MultiplyCcc::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
   const dim3 blocks = dim3(numBlocks);
   const dim3 threads = dim3(mAlignment);
 
-  k_Multiply<cuComplex, cuComplex, cuComplex>
-      <<<blocks, threads, 0, mCudaStream>>>(
-          mInputBuffers[0]->readPtr<cuComplex>(),
-          mInputBuffers[1]->readPtr<cuComplex>(),
-          portOutputs[0]->writePtr<cuComplex>());
+  k_Multiply<cuComplex, cuComplex, cuComplex><<<blocks, threads, 0, mCudaStream>>>(
+      mInputBuffers[0]->readPtr<cuComplex>(),
+      mInputBuffers[1]->readPtr<cuComplex>(),
+      portOutputs[0]->writePtr<cuComplex>());
 
   const size_t writtenNumBytes = processNumInputElements * sizeof(cuComplex);
   outputBuffer->increaseEndOffset(writtenNumBytes);

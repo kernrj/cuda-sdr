@@ -20,28 +20,22 @@
 
 using namespace std;
 
-#define SAFERF(__cmd, __errorMsg)                               \
-  do {                                                          \
-    int status = (__cmd);                                       \
-    if (status != HACKRF_SUCCESS) {                             \
-      const string errorName =                                  \
-          hackrf_error_name(static_cast<hackrf_error>(status)); \
-      throw runtime_error(                                      \
-          string(__errorMsg) + " - Error " + errorName + " ("   \
-          + to_string(status) + ")");                           \
-    }                                                           \
+#define SAFERF(__cmd, __errorMsg)                                                                         \
+  do {                                                                                                    \
+    int status = (__cmd);                                                                                 \
+    if (status != HACKRF_SUCCESS) {                                                                       \
+      const string errorName = hackrf_error_name(static_cast<hackrf_error>(status));                      \
+      throw runtime_error(string(__errorMsg) + " - Error " + errorName + " (" + to_string(status) + ")"); \
+    }                                                                                                     \
   } while (false)
 
-void HackrfSource::setSampleCallback(
-    std::function<void(const int8_t* data, size_t dataLength)>&&
-        sampleCallback) {
+void HackrfSource::setSampleCallback(std::function<void(const int8_t* data, size_t dataLength)>&& sampleCallback) {
   mSampleCallback = std::move(sampleCallback);
 }
 
 vector<string> HackrfSource::getDeviceSerialNumbers() {
   hackrf_device_list_t* deviceList = hackrf_device_list();
-  const auto freeDeviceList =
-      ScopeExit([deviceList]() { hackrf_device_list_free(deviceList); });
+  const auto freeDeviceList = ScopeExit([deviceList]() { hackrf_device_list_free(deviceList); });
 
   vector<string> deviceSerialNumbers(deviceList->devicecount);
   for (size_t i = 0; i < deviceList->devicecount; i++) {
@@ -52,11 +46,9 @@ vector<string> HackrfSource::getDeviceSerialNumbers() {
 }
 
 void HackrfSource::selectDeviceByIndex(int deviceIndex) {
-  const auto deviceList = shared_ptr<hackrf_device_list_t>(
-      hackrf_device_list(),
-      [](hackrf_device_list_t* deviceList) {
-        hackrf_device_list_free(deviceList);
-      });
+  const auto deviceList = shared_ptr<hackrf_device_list_t>(hackrf_device_list(), [](hackrf_device_list_t* deviceList) {
+    hackrf_device_list_free(deviceList);
+  });
 
   if (deviceList->devicecount <= 0) {
     throw runtime_error("No HackRF devices found");
@@ -64,19 +56,14 @@ void HackrfSource::selectDeviceByIndex(int deviceIndex) {
 
   if (deviceIndex >= deviceList->devicecount) {
     throw runtime_error(
-        "Device with index [" + to_string(deviceIndex)
-        + "] does not exist. Max is [" + to_string(deviceList->devicecount)
-        + "]");
+        "Device with index [" + to_string(deviceIndex) + "] does not exist. Max is ["
+        + to_string(deviceList->devicecount) + "]");
   }
 
   hackrf_device* deviceRaw = nullptr;
-  SAFERF(
-      hackrf_device_list_open(deviceList.get(), deviceIndex, &deviceRaw),
-      "Error opening HackRF device");
+  SAFERF(hackrf_device_list_open(deviceList.get(), deviceIndex, &deviceRaw), "Error opening HackRF device");
 
-  mHackrfDevice = shared_ptr<hackrf_device>(
-      deviceRaw,
-      [](hackrf_device* device) { hackrf_close(device); });
+  mHackrfDevice = shared_ptr<hackrf_device>(deviceRaw, [](hackrf_device* device) { hackrf_close(device); });
 
   for (int i = 0; i < deviceList->devicecount; i++) {
     const char* sn = deviceList->serial_numbers[i];
@@ -85,11 +72,9 @@ void HackrfSource::selectDeviceByIndex(int deviceIndex) {
 }
 
 void HackrfSource::selectDeviceBySerialNumber(const std::string& serialNumber) {
-  const auto deviceList = shared_ptr<hackrf_device_list_t>(
-      hackrf_device_list(),
-      [](hackrf_device_list_t* deviceList) {
-        hackrf_device_list_free(deviceList);
-      });
+  const auto deviceList = shared_ptr<hackrf_device_list_t>(hackrf_device_list(), [](hackrf_device_list_t* deviceList) {
+    hackrf_device_list_free(deviceList);
+  });
 
   if (deviceList->devicecount <= 0) {
     throw runtime_error("No HackRF devices found");
@@ -106,18 +91,13 @@ void HackrfSource::selectDeviceBySerialNumber(const std::string& serialNumber) {
   }
 
   if (deviceIndex < 0) {
-    throw runtime_error(
-        "No device exists with serial number [" + serialNumber + "]");
+    throw runtime_error("No device exists with serial number [" + serialNumber + "]");
   }
 
   hackrf_device* deviceRaw = nullptr;
-  SAFERF(
-      hackrf_device_list_open(deviceList.get(), deviceIndex, &deviceRaw),
-      "Error opening HackRF device");
+  SAFERF(hackrf_device_list_open(deviceList.get(), deviceIndex, &deviceRaw), "Error opening HackRF device");
 
-  mHackrfDevice = shared_ptr<hackrf_device>(
-      deviceRaw,
-      [](hackrf_device* device) { hackrf_close(device); });
+  mHackrfDevice = shared_ptr<hackrf_device>(deviceRaw, [](hackrf_device* device) { hackrf_close(device); });
 }
 
 int HackrfSource::rxCallbackWrapper(hackrf_transfer* transfer) {
@@ -126,9 +106,7 @@ int HackrfSource::rxCallbackWrapper(hackrf_transfer* transfer) {
 }
 
 int HackrfSource::rxCallback(hackrf_transfer* transfer) {
-  mSampleCallback(
-      reinterpret_cast<const int8_t*>(transfer->buffer),
-      static_cast<size_t>(transfer->valid_length));
+  mSampleCallback(reinterpret_cast<const int8_t*>(transfer->buffer), static_cast<size_t>(transfer->valid_length));
   return 0;
 }
 
@@ -137,17 +115,9 @@ void HackrfSource::start() {
     throw runtime_error("Select a HackRF device before starting");
   }
 
-  SAFERF(
-      hackrf_set_freq(mHackrfDevice.get(), 15000000),
-      "Error setting frequency");
-  SAFERF(
-      hackrf_set_sample_rate(mHackrfDevice.get(), 256000),
-      "Error setting sample rate");
-  SAFERF(
-      hackrf_start_rx(mHackrfDevice.get(), rxCallbackWrapper, this),
-      "Error starting device");
+  SAFERF(hackrf_set_freq(mHackrfDevice.get(), 15000000), "Error setting frequency");
+  SAFERF(hackrf_set_sample_rate(mHackrfDevice.get(), 256000), "Error setting sample rate");
+  SAFERF(hackrf_start_rx(mHackrfDevice.get(), rxCallbackWrapper, this), "Error starting device");
 }
 
-void HackrfSource::stop() {
-  SAFERF(hackrf_close(mHackrfDevice.get()), "Cannot close HackRF device");
-}
+void HackrfSource::stop() { SAFERF(hackrf_close(mHackrfDevice.get()), "Cannot close HackRF device"); }

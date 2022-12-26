@@ -30,20 +30,13 @@
 
 class FirCcf : public Filter {
  public:
-  FirCcf(
-      size_t decimation,
-      const std::vector<float>& taps,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream);
+  FirCcf(size_t decimation, const std::vector<float>& taps, int32_t cudaDevice, cudaStream_t cudaStream);
 
-  [[nodiscard]] std::shared_ptr<Buffer> requestBuffer(
-      size_t port,
-      size_t numBytes) override;
+  [[nodiscard]] std::shared_ptr<Buffer> requestBuffer(size_t port, size_t numBytes) override;
   void commitBuffer(size_t port, size_t numBytes) override;
   [[nodiscard]] size_t getOutputDataSize(size_t port) override;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(
-      const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
+  void readOutput(const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
 
  private:
   static const size_t mAlignment;
@@ -59,11 +52,8 @@ class FirCcf : public Filter {
   void setTaps(const std::vector<float>& tapsReversed);
 };
 
-std::vector<float> generateLowPassTaps(
-    float sampleFrequency,
-    float cutoffFrequency,
-    float transitionWidth,
-    float dbAttenuation);
+std::vector<float>
+generateLowPassTaps(float sampleFrequency, float cutoffFrequency, float transitionWidth, float dbAttenuation);
 
 /**
  * https://tomroelandts.com/articles/how-to-create-a-configurable-filter-using-a-kaiser-window
@@ -72,8 +62,6 @@ std::vector<float> generateLowPassTaps(
  * @param transitionWidthNormalized
  * @return
  */
-size_t kaiserWindowLength(
-    float dbAttenuation,
-    float transitionWidthNormalized);
+size_t kaiserWindowLength(float dbAttenuation, float transitionWidthNormalized);
 
 #endif  // SDRTEST_SRC_FIR_H_

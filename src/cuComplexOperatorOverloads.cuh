@@ -19,54 +19,39 @@
 
 #include <cuda_runtime_api.h>
 
-__forceinline__ __host__ __device__ cuComplex
-operator*(const cuComplex c1, const cuComplex c2) {
+__forceinline__ __host__ __device__ cuComplex operator*(const cuComplex c1, const cuComplex c2) {
   return cuCmulf(c1, c2);
 }
 
-__forceinline__ __host__ __device__ cuComplex
-operator*(const cuComplex c, const float r) {
+__forceinline__ __host__ __device__ cuComplex operator*(const cuComplex c, const float r) {
   return make_cuComplex(cuCrealf(c) * r, cuCimagf(c) * r);
 }
 
-__forceinline__ __host__ __device__ cuComplex
-operator*(const float r, const cuComplex c) {
-  return c * r;
-}
+__forceinline__ __host__ __device__ cuComplex operator*(const float r, const cuComplex c) { return c * r; }
 
-__forceinline__ __host__ __device__ cuComplex
-operator/(const cuComplex c1, const cuComplex c2) {
+__forceinline__ __host__ __device__ cuComplex operator/(const cuComplex c1, const cuComplex c2) {
   return cuCdivf(c1, c2);
 }
 
-__forceinline__ __host__ __device__ cuComplex
-operator/(const cuComplex c, const float r) {
+__forceinline__ __host__ __device__ cuComplex operator/(const cuComplex c, const float r) {
   return make_cuComplex(cuCrealf(c) / r, cuCimagf(c) / r);
 }
 
-__forceinline__ __host__ __device__ cuComplex
-operator/(const float r, const cuComplex c) {
+__forceinline__ __host__ __device__ cuComplex operator/(const float r, const cuComplex c) {
   return make_cuComplex(r / cuCrealf(c), r / cuCimagf(c));
 }
 
-__forceinline__ __host__ __device__ cuComplex
-operator+(const cuComplex c1, const cuComplex c2) {
+__forceinline__ __host__ __device__ cuComplex operator+(const cuComplex c1, const cuComplex c2) {
   return cuCaddf(c1, c2);
 }
 
-__forceinline__ __host__ __device__ cuComplex
-operator+(const cuComplex c, const float r) {
+__forceinline__ __host__ __device__ cuComplex operator+(const cuComplex c, const float r) {
   return make_cuComplex(cuCrealf(c) + r, cuCimagf(c));
 }
 
-__forceinline__ __host__ __device__ cuComplex
-operator+(const float r, const cuComplex c) {
-  return c + r;
-}
+__forceinline__ __host__ __device__ cuComplex operator+(const float r, const cuComplex c) { return c + r; }
 
-__forceinline__ __host__ __device__ cuComplex& operator+=(
-    cuComplex& lhs,
-    const cuComplex rhs) {
+__forceinline__ __host__ __device__ cuComplex& operator+=(cuComplex& lhs, const cuComplex rhs) {
   lhs.x += rhs.x;
   lhs.y += rhs.y;
 

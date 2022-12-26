@@ -17,14 +17,11 @@ class CudaHostToDeviceMemcpy : public Filter {
 
   ~CudaHostToDeviceMemcpy() override = default;
 
-  [[nodiscard]] std::shared_ptr<Buffer> requestBuffer(
-      size_t port,
-      size_t numBytes) override;
+  [[nodiscard]] std::shared_ptr<Buffer> requestBuffer(size_t port, size_t numBytes) override;
   void commitBuffer(size_t port, size_t numBytes) override;
   [[nodiscard]] size_t getOutputDataSize(size_t port) override;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(
-      const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
+  void readOutput(const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
 
  private:
   int32_t mCudaDevice;

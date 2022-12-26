@@ -30,8 +30,8 @@
 #include <stack>
 #include <thread>
 
-#include "fm.h"
 #include "../prototype/fm_pipeline.h"
+#include "fm.h"
 
 using namespace std;
 
@@ -52,8 +52,7 @@ static void cleanupThings() {
 class Thread2 {
  public:
   explicit Thread2(function<void()>&& callable)
-      : mThreadExited(false),
-        mThread([this, threadFnc = std::move(callable)]() {
+      : mThreadExited(false), mThread([this, threadFnc = std::move(callable)]() {
           threadFnc();
 
           {
@@ -139,8 +138,7 @@ int raw() {
   const double maxRfSampleRate = 20e6;
   const double centerFreq = 145e6;
   const double rfSampleRate = round(
-      floor(maxRfSampleRate / (audioSampleRate * lowPassFilterDecimation))
-      * audioSampleRate * lowPassFilterDecimation);
+      floor(maxRfSampleRate / (audioSampleRate * lowPassFilterDecimation)) * audioSampleRate * lowPassFilterDecimation);
 
   auto osmoSource = osmosdr::source::make("hackrf=2556b2c3");
   osmoSource->set_sample_rate(rfSampleRate);
@@ -175,15 +173,12 @@ int nbfmFromRaw() {
   const double maxRfSampleRate = 20e6;
   const double centerFreq = 145e6;
   const double rfSampleRate = round(
-      floor(maxRfSampleRate / (audioSampleRate * lowPassFilterDecimation))
-      * audioSampleRate * lowPassFilterDecimation);
+      floor(maxRfSampleRate / (audioSampleRate * lowPassFilterDecimation)) * audioSampleRate * lowPassFilterDecimation);
   const gr::blocks::wavfile_format_t waveFormat = gr::blocks::FORMAT_WAV;
-  const gr::blocks::wavfile_subformat_t saveSubFormat =
-      gr::blocks::FORMAT_FLOAT;
+  const gr::blocks::wavfile_subformat_t saveSubFormat = gr::blocks::FORMAT_FLOAT;
   const bool append = false;
 
-  const auto source =
-      gr::blocks::file_source::make(8, "/home/rick/sdr/raw.bin", false);
+  const auto source = gr::blocks::file_source::make(8, "/home/rick/sdr/raw.bin", false);
 
   vector<double> channelFreqs = {
       // 146.46e6,
@@ -191,20 +186,11 @@ int nbfmFromRaw() {
   };
   for (double channelFreq : channelFreqs) {
     char filename[256];
-    snprintf(
-        filename,
-        sizeof(filename) - 1,
-        "/home/rick/sdr/%0.3f.wav",
-        channelFreq / 1e6);
+    snprintf(filename, sizeof(filename) - 1, "/home/rick/sdr/%0.3f.wav", channelFreq / 1e6);
     filename[sizeof(filename) - 1] = 0;
 
-    auto wavFileSink = gr::blocks::wavfile_sink::make(
-        filename,
-        channelCount,
-        audioSampleRate,
-        waveFormat,
-        saveSubFormat,
-        append);
+    auto wavFileSink =
+        gr::blocks::wavfile_sink::make(filename, channelCount, audioSampleRate, waveFormat, saveSubFormat, append);
 
     FmChannel fmChannel {
         .channelFreq = channelFreq,
@@ -243,11 +229,9 @@ int nbfm() {
   const double maxRfSampleRate = 20e6;
   const double centerFreq = 145e6;
   const double rfSampleRate = round(
-      floor(maxRfSampleRate / (audioSampleRate * lowPassFilterDecimation))
-      * audioSampleRate * lowPassFilterDecimation);
+      floor(maxRfSampleRate / (audioSampleRate * lowPassFilterDecimation)) * audioSampleRate * lowPassFilterDecimation);
   const gr::blocks::wavfile_format_t waveFormat = gr::blocks::FORMAT_WAV;
-  const gr::blocks::wavfile_subformat_t saveSubFormat =
-      gr::blocks::FORMAT_FLOAT;
+  const gr::blocks::wavfile_subformat_t saveSubFormat = gr::blocks::FORMAT_FLOAT;
   const bool append = false;
 
   auto osmoSource = osmosdr::source::make("hackrf=2556b2c3");
@@ -264,20 +248,11 @@ int nbfm() {
   };
   for (double channelFreq : channelFreqs) {
     char filename[256];
-    snprintf(
-        filename,
-        sizeof(filename) - 1,
-        "/home/rick/sdr/%0.3f.wav",
-        channelFreq / 1e6);
+    snprintf(filename, sizeof(filename) - 1, "/home/rick/sdr/%0.3f.wav", channelFreq / 1e6);
     filename[sizeof(filename) - 1] = 0;
 
-    auto wavFileSink = gr::blocks::wavfile_sink::make(
-        filename,
-        channelCount,
-        audioSampleRate,
-        waveFormat,
-        saveSubFormat,
-        append);
+    auto wavFileSink =
+        gr::blocks::wavfile_sink::make(filename, channelCount, audioSampleRate, waveFormat, saveSubFormat, append);
 
     FmChannel fmChannel {
         .channelFreq = channelFreq,
@@ -326,8 +301,7 @@ int fmRadio(int argc, char** argv) {
   };
 
   const double rfSampleRate = round(
-      floor(maxRfSampleRate / (audioSampleRate * lowPassFilterDecimation))
-      * audioSampleRate * lowPassFilterDecimation);
+      floor(maxRfSampleRate / (audioSampleRate * lowPassFilterDecimation)) * audioSampleRate * lowPassFilterDecimation);
   auto topBlock = gr::make_top_block("Top Block");
   runAtExit.push([topBlock]() { topBlock->stop(); });
 
@@ -340,8 +314,7 @@ int fmRadio(int argc, char** argv) {
   osmoSource->set_iq_balance_mode(osmosdr::source::IQBalanceAutomatic);
 
   const gr::blocks::wavfile_format_t waveFormat = gr::blocks::FORMAT_WAV;
-  const gr::blocks::wavfile_subformat_t saveSubFormat =
-      gr::blocks::FORMAT_FLOAT;
+  const gr::blocks::wavfile_subformat_t saveSubFormat = gr::blocks::FORMAT_FLOAT;
   const bool append = false;
 
   vector<double> channelFreqs = {
@@ -352,20 +325,11 @@ int fmRadio(int argc, char** argv) {
   };
   for (double channelFreq : channelFreqs) {
     char filename[256];
-    snprintf(
-        filename,
-        sizeof(filename) - 1,
-        "/home/rick/sdr/%0.1f.wav",
-        channelFreq / 1e6);
+    snprintf(filename, sizeof(filename) - 1, "/home/rick/sdr/%0.1f.wav", channelFreq / 1e6);
     filename[sizeof(filename) - 1] = 0;
 
-    auto wavFileSink = gr::blocks::wavfile_sink::make(
-        filename,
-        channelCount,
-        audioSampleRate,
-        waveFormat,
-        saveSubFormat,
-        append);
+    auto wavFileSink =
+        gr::blocks::wavfile_sink::make(filename, channelCount, audioSampleRate, waveFormat, saveSubFormat, append);
 
     FmChannel fmChannel {
         .channelFreq = channelFreq,

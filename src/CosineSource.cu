@@ -23,8 +23,7 @@
 
 using namespace std;
 
-__global__ void
-k_ComplexCosine(float indexToRadiansMultiplier, float phi, cuComplex* values) {
+__global__ void k_ComplexCosine(float indexToRadiansMultiplier, float phi, cuComplex* values) {
   const uint32_t x = blockDim.x * blockIdx.x + threadIdx.x;
   const float theta = phi + static_cast<float>(x) * indexToRadiansMultiplier;
 
@@ -34,17 +33,10 @@ k_ComplexCosine(float indexToRadiansMultiplier, float phi, cuComplex* values) {
   values[x] = result;
 }
 
-CosineSource::CosineSource(
-    float sampleRate,
-    float frequency,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream)
-    : mSampleRate(sampleRate),
-      mFrequency(frequency),
-      mIndexToRadiansMultiplier(
-          static_cast<float>(2.0 * M_PI / (mSampleRate / mFrequency))),
-      mCudaDevice(cudaDevice), mCudaStream(cudaStream), mPhi(0.0f),
-      mAlignment(32) {}
+CosineSource::CosineSource(float sampleRate, float frequency, int32_t cudaDevice, cudaStream_t cudaStream)
+    : mSampleRate(sampleRate), mFrequency(frequency),
+      mIndexToRadiansMultiplier(static_cast<float>(2.0 * M_PI / (mSampleRate / mFrequency))), mCudaDevice(cudaDevice),
+      mCudaStream(cudaStream), mPhi(0.0f), mAlignment(32) {}
 
 size_t CosineSource::getOutputDataSize(size_t port) {
   if (port > 0) {
@@ -54,9 +46,7 @@ size_t CosineSource::getOutputDataSize(size_t port) {
   return 16 * 1024 * mAlignment * sizeof(cuComplex);
 }
 
-size_t CosineSource::getOutputSizeAlignment(size_t port) {
-  return mAlignment * sizeof(cuComplex);
-}
+size_t CosineSource::getOutputSizeAlignment(size_t port) { return mAlignment * sizeof(cuComplex); }
 
 void CosineSource::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
   if (portOutputs.empty()) {
@@ -73,10 +63,7 @@ void CosineSource::readOutput(const vector<shared_ptr<Buffer>>& portOutputs) {
   const dim3 blocks(blockCount);
   const dim3 threads(mAlignment);
 
-  k_ComplexCosine<<<blocks, threads, 0, mCudaStream>>>(
-      mIndexToRadiansMultiplier,
-      mPhi,
-      output->writePtr<cuComplex>());
+  k_ComplexCosine<<<blocks, threads, 0, mCudaStream>>>(mIndexToRadiansMultiplier, mPhi, output->writePtr<cuComplex>());
 
   const size_t outputNumValues = blockCount * mAlignment;
   mPhi += static_cast<float>(outputNumValues) * mIndexToRadiansMultiplier;

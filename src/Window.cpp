@@ -3,6 +3,7 @@
 //
 
 #include "Window.h"
+
 #include <cmath>
 
 using namespace std;

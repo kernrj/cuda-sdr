@@ -23,27 +23,24 @@
 
 class QuadDemod : public Filter {
  public:
-    QuadDemod(int32_t cudaDevice, cudaStream_t cudaStream);
-    ~QuadDemod() override = default;
+  QuadDemod(int32_t cudaDevice, cudaStream_t cudaStream);
+  ~QuadDemod() override = default;
 
-    [[nodiscard]] std::shared_ptr<Buffer> requestBuffer(
-        size_t port,
-        size_t numBytes) override;
-    void commitBuffer(size_t port, size_t numBytes) override;
-    [[nodiscard]] size_t getOutputDataSize(size_t port) override;
-    [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-    void readOutput(
-        const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
+  [[nodiscard]] std::shared_ptr<Buffer> requestBuffer(size_t port, size_t numBytes) override;
+  void commitBuffer(size_t port, size_t numBytes) override;
+  [[nodiscard]] size_t getOutputDataSize(size_t port) override;
+  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
+  void readOutput(const std::vector<std::shared_ptr<Buffer>>& portOutputs) override;
 
  private:
-    static const size_t mAlignment;
-    int32_t mCudaDevice;
-    cudaStream_t mCudaStream;
-    std::shared_ptr<Buffer> mInputBuffer;
-    bool mBufferCheckedOut;
+  static const size_t mAlignment;
+  int32_t mCudaDevice;
+  cudaStream_t mCudaStream;
+  std::shared_ptr<Buffer> mInputBuffer;
+  bool mBufferCheckedOut;
 
  private:
-    [[nodiscard]] size_t getAvailableNumInputElements() const;
+  [[nodiscard]] size_t getAvailableNumInputElements() const;
 };
 
-#endif //GPUSDR_SRC_QUADDEMOD_H_
+#endif  // GPUSDR_SRC_QUADDEMOD_H_

@@ -32,8 +32,7 @@ __global__ void k_AddConst(const float* in, float addConst, float* out) {
 }
 
 AddConst::AddConst(float addConst, int32_t cudaDevice, cudaStream_t cudaStream)
-    : mAddConst(addConst), mCudaDevice(cudaDevice), mCudaStream(cudaStream),
-      mBufferCheckedOut(false) {}
+    : mAddConst(addConst), mCudaDevice(cudaDevice), mCudaStream(cudaStream), mBufferCheckedOut(false) {}
 
 shared_ptr<Buffer> AddConst::requestBuffer(size_t port, size_t numBytes) {
   if (mBufferCheckedOut) {
@@ -63,17 +62,11 @@ void AddConst::commitBuffer(size_t port, size_t numBytes) {
   mBufferCheckedOut = false;
 }
 
-size_t AddConst::getOutputDataSize(size_t port) {
-  return getAvailableNumInputElements() * sizeof(float);
-}
+size_t AddConst::getOutputDataSize(size_t port) { return getAvailableNumInputElements() * sizeof(float); }
 
-size_t AddConst::getAvailableNumInputElements() const {
-  return mInputBuffer->used() / sizeof(float);
-}
+size_t AddConst::getAvailableNumInputElements() const { return mInputBuffer->used() / sizeof(float); }
 
-size_t AddConst::getOutputSizeAlignment(size_t port) {
-  return mAlignment * sizeof(float);
-}
+size_t AddConst::getOutputSizeAlignment(size_t port) { return mAlignment * sizeof(float); }
 
 void AddConst::readOutput(const std::vector<std::shared_ptr<Buffer>>& portOutputs) {
   if (portOutputs.empty()) {
@@ -86,8 +79,7 @@ void AddConst::readOutput(const std::vector<std::shared_ptr<Buffer>>& portOutput
   const auto& outputBuffer = portOutputs[0];
   const size_t maxNumOutputElements = outputBuffer->remaining() / sizeof(float);
 
-  const size_t maxUnalignedNumElementsToProcess =
-      min(numInputElements, maxNumOutputElements);
+  const size_t maxUnalignedNumElementsToProcess = min(numInputElements, maxNumOutputElements);
 
   const size_t numBlocks = maxUnalignedNumElementsToProcess / mAlignment;
   const size_t processNumInputElements = numBlocks * mAlignment;

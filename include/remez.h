@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#define BANDPASS       1
+#define BANDPASS 1
 #define DIFFERENTIATOR 2
 
 // type parameter for remez()
@@ -64,9 +64,13 @@ RemezStatus remezNew(
     size_t griddensity,
     size_t maxIterations);
 
-extern "C"
-void remez(double h[], int *numtaps,
-           int *numband, const double bands[],
-           const double des[], const double weight[],
-           int *type, int *griddensity);
+extern "C" void remez(
+    double h[],
+    int* numtaps,
+    int* numband,
+    const double bands[],
+    const double des[],
+    const double weight[],
+    int* type,
+    int* griddensity);
 #endif  // SDRTEST_SRC_REMEZ_H_
