@@ -29,6 +29,7 @@ set(GTEST_INCLUDE_DIR "${CMAKE_BINARY_DIR}/_deps/googletest-src/googletest/inclu
 target_include_directories(
         gpusdr_tests
         SYSTEM PUBLIC
+        /usr/local/cuda/include
         "${GTEST_INCLUDE_DIR}"
 )
 
