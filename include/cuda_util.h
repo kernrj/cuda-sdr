@@ -21,6 +21,7 @@
 #include <cuda_runtime.h>
 
 #include <stdexcept>
+#include <string>
 
 /*
  * CLion shows a syntax error at the '<<<>>>' when invoking a kernel because
@@ -33,8 +34,18 @@ extern cudaError_t cudaConfigureCall(
     size_t sharedMem = 0,
     cudaStream_t stream = nullptr);
 
+inline void checkCuda(const char *msg) {
+    cudaError_t status = cudaDeviceSynchronize();
+    if (status != cudaSuccess) {
+        const char *errName = cudaGetErrorName(status);
+        fprintf(stderr, "%s: %s (%d).\n", msg, errName, status);
+        throw std::runtime_error(std::string(msg) + ": " + errName + " (" + std::to_string(status) + ").");
+    }
+}
+
 #define SAFE_CUDA(__cmd)                                                 \
   do {                                                                   \
+    checkCuda("Before: " #__cmd);                                        \
     cudaError_t __status = (__cmd);                                      \
     if (__status != cudaSuccess) {                                       \
       throw std::runtime_error(                                          \
@@ -45,10 +56,10 @@ extern cudaError_t cudaConfigureCall(
   } while (false)
 
 inline int32_t getCurrentCudaDevice() {
-  int32_t device = -1;
-  SAFE_CUDA(cudaGetDevice(&device));
+    int32_t device = -1;
+    SAFE_CUDA(cudaGetDevice(&device));
 
-  return device;
+    return device;
 }
 
 #endif  // SDRTEST_SRC_CUDA_UTIL_H_

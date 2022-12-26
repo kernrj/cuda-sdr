@@ -188,12 +188,14 @@ void FirCcf::readOutput(const vector<shared_ptr<Buffer>> &portOutputs) {
             mTapCount,
             outputBuffer->writePtr<cuComplex>());
     } else {
+        checkCuda("Before k_FirDecimate()");
         k_FirDecimate<<<blocks, threads, 0, mCudaStream>>>(
             mInputBuffer->readPtr<cuComplex>(),
             mTaps->readPtr<float>(),
             mTapCount,
             mDecimation,
             outputBuffer->writePtr<cuComplex>());
+        checkCuda("After k_FirDecimate()");
     }
 
     const size_t numOutputs = min(numBlocks * mAlignment, availableNumOutputs);
