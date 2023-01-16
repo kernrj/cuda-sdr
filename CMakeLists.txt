@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(gpusdr)
+set( LIB_PROJECT_NAME gpusdrpipeline )
+set( LIB_TARGET_NAME ${LIB_PROJECT_NAME} )
+set( PROJECT_MACRO_PREFIX GPUSDR )
+
+project(${LIB_PROJECT_NAME})
+
+set( LIB_PROJECT_ROOT_DIR "${PROJECT_SOURCE_DIR}")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

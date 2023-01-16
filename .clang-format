@@ -98,6 +98,7 @@ ObjCBinPackProtocolList: Never
 ObjCBlockIndentWidth: 2
 ObjCSpaceAfterProperty: false
 ObjCSpaceBeforeProtocolList: true
+PackConstructorInitializers: Never
 PenaltyBreakAssignment: 2
 PenaltyBreakBeforeFirstCallParameter: 1
 PenaltyBreakComment: 300
@@ -105,7 +106,7 @@ PenaltyBreakFirstLessLess: 120
 PenaltyBreakString: 1000
 PenaltyBreakTemplateDeclaration: 10
 PenaltyExcessCharacter: 1000000
-PenaltyReturnTypeOnItsOwnLine: 200
+PenaltyReturnTypeOnItsOwnLine: 400
 PointerAlignment: Left
 RawStringFormats:
   - Language:        Cpp
@@ -135,6 +136,7 @@ RawStringFormats:
       - ParseTextProtoOrDie
     CanonicalDelimiter: ''
     BasedOnStyle:    google
+ReferenceAlignment: Left
 ReflowComments:  true
 SortIncludes:    true
 SortUsingDeclarations: true

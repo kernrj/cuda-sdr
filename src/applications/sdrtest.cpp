@@ -19,6 +19,7 @@
 #include <gnuradio/blocks/wavfile_sink.h>
 #include <gnuradio/filter/firdes.h>
 #include <gnuradio/top_block.h>
+#include <gpusdrpipeline/fm.h>
 #include <osmosdr/source.h>
 
 #include <atomic>
@@ -31,7 +32,6 @@
 #include <thread>
 
 #include "../prototype/fm_pipeline.h"
-#include "fm.h"
 
 using namespace std;
 
@@ -52,7 +52,8 @@ static void cleanupThings() {
 class Thread2 {
  public:
   explicit Thread2(function<void()>&& callable)
-      : mThreadExited(false), mThread([this, threadFnc = std::move(callable)]() {
+      : mThreadExited(false),
+        mThread([this, threadFnc = std::move(callable)]() {
           threadFnc();
 
           {

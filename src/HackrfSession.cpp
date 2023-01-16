@@ -46,12 +46,15 @@ static void cleanupAtExit() {
   }
 
   sessionCount = 0;
+  printf("hackrf_exit() while exiting\n");
   hackrf_exit();
 }
 
 static void incSessionRefCount() {
   lock_guard<mutex> lock(sessionLock);
   if (sessionCount == 0) {
+    printf("hackrf_init()\n");
+
     SAFE_HRF(hackrf_init(), "HackRF library initialization");
 
     if (!registeredAtExitHandler) {
@@ -80,6 +83,7 @@ static void decSessionRefCount() {
   sessionCount--;
 
   if (sessionCount == 0) {
+    printf("hackrf_exit()\n");
     hackrf_exit();
   }
 }
