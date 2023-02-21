@@ -17,13 +17,15 @@
 #ifndef GPUSDR_IRESIZABLE_H
 #define GPUSDR_IRESIZABLE_H
 
+#include <gpusdrpipeline/IRef.h>
+
 #include <cstddef>
 
-class IResizable {
+class IResizable : public virtual IRef {
  public:
-  virtual ~IResizable() = default;
+  virtual Status resize(size_t newSize) noexcept = 0;
 
-  virtual void resize(size_t newSize, size_t* actualSizeOut) = 0;
+  ABSTRACT_IREF(IResizable);
 };
 
 #endif  // GPUSDR_IRESIZABLE_H

@@ -19,6 +19,7 @@
 #include <gnuradio/blocks/wavfile_sink.h>
 #include <gnuradio/filter/firdes.h>
 #include <gnuradio/top_block.h>
+#include <gpusdrpipeline/GSLog.h>
 #include <gpusdrpipeline/fm.h>
 #include <osmosdr/source.h>
 
@@ -90,7 +91,7 @@ static void waitForStop(const gr::top_block_sptr& topBlock) {
   Thread2 blockWaitThread([topBlock]() {
     topBlock->wait();
 
-    printf("Graph ended\n");
+    gslog(GSLOG_INFO, "Graph ended");
     wasInterrupted.store(true);
     wasInterruptedCv.notify_all();
   });
@@ -102,7 +103,7 @@ static void waitForStop(const gr::top_block_sptr& topBlock) {
 }
 
 static void exitSigHandler(int signum) {
-  printf("Caught signal %d, cleaning up.\n", signum);
+  gslog(GSLOG_INFO, "Caught signal %d, cleaning up.", signum);
   cleanupThings();
 
   if (signum == SIGINT || signum == SIGTERM) {
@@ -154,13 +155,13 @@ int raw() {
   const auto fileSink = gr::blocks::file_sink::make(8, filename);
   topBlock->connect(osmoSource, 0, fileSink, 0);
 
-  printf("Starting...\n");
+  gslog(GSLOG_INFO, "Starting...");
   topBlock->start();
-  printf("Started\n");
+  gslog(GSLOG_INFO, "Started");
 
   waitForStop(topBlock);
 
-  printf("Done\n");
+  gslog(GSLOG_INFO, "Done");
   return 0;
 }
 
@@ -210,13 +211,13 @@ int nbfmFromRaw() {
     topBlock->connect(fmDemod, 0, wavFileSink, 0);
   }
 
-  printf("Starting...\n");
+  gslog(GSLOG_INFO, "Starting...");
   topBlock->start();
-  printf("Started\n");
+  gslog(GSLOG_INFO, "Started");
 
   waitForStop(topBlock);
 
-  printf("Done\n");
+  gslog(GSLOG_INFO, "Done");
   return 0;
 }
 
@@ -272,13 +273,13 @@ int nbfm() {
     topBlock->connect(fmDemod, 0, wavFileSink, 0);
   }
 
-  printf("Starting...\n");
+  gslog(GSLOG_INFO, "Starting...");
   topBlock->start();
-  printf("Started\n");
+  gslog(GSLOG_INFO, "Started");
 
   waitForStop(topBlock);
 
-  printf("Done\n");
+  gslog(GSLOG_INFO, "Done");
   return 0;
 }
 
@@ -349,12 +350,12 @@ int fmRadio(int argc, char** argv) {
     topBlock->connect(fmDemod, 0, wavFileSink, 0);
   }
 
-  printf("Starting...\n");
+  gslog(GSLOG_INFO, "Starting...");
   topBlock->start();
-  printf("Started\n");
+  gslog(GSLOG_INFO, "Started");
 
   waitForStop(topBlock);
 
-  printf("Done\n");
+  gslog(GSLOG_INFO, "Done");
   return 0;
 }

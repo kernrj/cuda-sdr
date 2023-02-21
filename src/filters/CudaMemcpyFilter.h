@@ -24,20 +24,29 @@
 #include "Factories.h"
 #include "filters/BaseFilter.h"
 
-class CudaMemcpyFilter : public BaseFilter {
+class CudaMemcpyFilter final : public BaseFilter {
  public:
-  CudaMemcpyFilter(cudaMemcpyKind memcpyKind, int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories);
+  static Result<Filter> create(
+      cudaMemcpyKind memcpyKind,
+      int32_t cudaDevice,
+      cudaStream_t cudaStream,
+      IFactories* factories) noexcept;
 
-  ~CudaMemcpyFilter() override = default;
-
-  [[nodiscard]] size_t getOutputDataSize(size_t port) override;
-  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) override;
+  [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
+  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
+  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
 
  private:
-  int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
-  const std::shared_ptr<IBufferCopier> mMemCopier;
+  ConstRef<IBufferCopier> mMemCopier;
+
+ private:
+  CudaMemcpyFilter(
+      IRelocatableResizableBufferFactory* relocatableBufferFactory,
+      IBufferSliceFactory* bufferSliceFactory,
+      IMemSet* memSet,
+      IBufferCopier* cudaCopier) noexcept;
+
+  REF_COUNTED(CudaMemcpyFilter);
 };
 
 #endif  // SDRTEST_SRC_CUDAHOSTTODEVICEMEMCPY_H_

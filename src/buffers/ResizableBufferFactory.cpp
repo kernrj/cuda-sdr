@@ -21,13 +21,13 @@
 using namespace std;
 
 ResizableBufferFactory::ResizableBufferFactory(
-    const std::shared_ptr<IAllocator>& allocator,
-    const std::shared_ptr<IBufferCopier>& bufferCopier,
-    const std::shared_ptr<IBufferRangeFactory>& bufferRangeFactory)
+    IAllocator* allocator,
+    const IBufferCopier* bufferCopier,
+    const IBufferRangeFactory* bufferRangeFactory) noexcept
     : mAllocator(allocator),
       mBufferCopier(bufferCopier),
       mBufferRangeFactory(bufferRangeFactory) {}
 
-shared_ptr<IResizableBuffer> ResizableBufferFactory::createResizableBuffer(size_t size) {
-  return make_shared<ResizableBuffer>(size, 0, 0, mAllocator, mBufferCopier, mBufferRangeFactory);
+Result<IResizableBuffer> ResizableBufferFactory::createResizableBuffer(size_t size) noexcept {
+  return ResizableBuffer::create(size, 0, 0, mAllocator, mBufferCopier, mBufferRangeFactory);
 }

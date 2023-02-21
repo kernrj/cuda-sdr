@@ -19,12 +19,11 @@
 
 #include <gpusdrpipeline/buffers/IRelocatableResizableBuffer.h>
 
-#include <memory>
-
-class IRelocatableResizableBufferFactory {
+class IRelocatableResizableBufferFactory : public virtual IRef {
  public:
-  virtual ~IRelocatableResizableBufferFactory() = default;
-  virtual std::shared_ptr<IRelocatableResizableBuffer> createRelocatableBuffer(size_t size) = 0;
+  virtual Result<IRelocatableResizableBuffer> createRelocatableBuffer(size_t size) const noexcept = 0;
+
+  ABSTRACT_IREF(IRelocatableResizableBufferFactory);
 };
 
 #endif  // GPUSDR_IRELOCATABLERESIZABLEBUFFERFACTORY_H

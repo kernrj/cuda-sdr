@@ -29,39 +29,53 @@
 #include "buffers/IRelocatableCudaBufferFactory.h"
 #include "filters/BaseFilter.h"
 
-class Fir : public BaseFilter {
+class Fir final : public BaseFilter {
  public:
-  Fir(FirType firType,
+  static Result<Filter> create(
+      SampleType tapType,
+      SampleType elementType,
       size_t decimation,
       const float* taps,
       size_t tapCount,
       int32_t cudaDevice,
       cudaStream_t cudaStream,
-      IFactories* factories);
+      IFactories* factories) noexcept;
 
-  [[nodiscard]] size_t getOutputDataSize(size_t port) override;
-  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) override;
+  [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
+  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
+  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
 
  private:
   static const size_t mAlignment;
 
-  const FirType mFirType;
-  IFactories* const mFactories;
+  const SampleType mTapType;
+  const SampleType mElementType;
 
-  const std::shared_ptr<IAllocator> mCudaAllocator;
+  ConstRef<IAllocator> mAllocator;
 
   size_t mDecimation;
-  std::shared_ptr<float> mTaps;
+  Ref<IMemory> mTaps;
   int32_t mTapCount;
   cudaStream_t mCudaStream;
   int32_t mCudaDevice;
   const size_t mElementSize;
 
  private:
-  void setTaps(const float* tapsReversed, size_t tapCount);
-  [[nodiscard]] size_t getNumOutputElements() const;
-  [[nodiscard]] size_t getNumInputElements() const;
+  Status setTaps(const float* tapsReversed, size_t tapCount) noexcept;
+  [[nodiscard]] size_t getNumOutputElements() const noexcept;
+  [[nodiscard]] size_t getNumInputElements() const noexcept;
+
+  Fir(SampleType tapType,
+      SampleType elementType,
+      size_t decimation,
+      int32_t cudaDevice,
+      cudaStream_t cudaStream,
+      IAllocator* allocator,
+      IRelocatableResizableBufferFactory* relocatableBufferFactory,
+      IBufferSliceFactory* bufferSliceFactory,
+      IMemSet* memSet) noexcept;
+
+  REF_COUNTED(Fir);
 };
 
 #endif  // GPUSDR_FIRCCF_H

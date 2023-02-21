@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Rick Kern <kernrj@gmail.com>
+ * Copyright 2022-2023 Rick Kern <kernrj@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,20 +19,56 @@
 
 #include <cuda.h>
 #include <gpusdrpipeline/CudaErrors.h>
+#include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/util/CudaUtil.h>
 
 #include <cstdint>
 
 class CudaDevicePushPop {
  public:
-  explicit CudaDevicePushPop(int32_t cudaDevice)
-      : mPreviousCudaDevice(getCurrentCudaDeviceOrThrow()) {
-    SAFE_CUDA(cudaSetDevice(cudaDevice));
-  }
+  CudaDevicePushPop(int32_t previousCudaDevice, bool hasPrevious) noexcept
+      : mPreviousCudaDevice(previousCudaDevice),
+        mIsSet(hasPrevious) {}
 
-  ~CudaDevicePushPop() { cudaSetDevice(mPreviousCudaDevice); }
+  CudaDevicePushPop() noexcept
+      : mPreviousCudaDevice(0),
+        mIsSet(false) {}
+
+  ~CudaDevicePushPop() {
+    if (mIsSet) {
+      cudaSetDevice(mPreviousCudaDevice);
+    }
+  }
 
  private:
   const int32_t mPreviousCudaDevice;
+  const bool mIsSet;
 };
+
+[[nodiscard]] inline Result<CudaDevicePushPop> pushCudaDevice(int32_t cudaDevice) noexcept {
+  int32_t previousDevice;
+  UNWRAP_OR_FWD_RESULT(previousDevice, gsGetCurrentCudaDevice());
+  SAFE_CUDA_OR_RET_RESULT(cudaSetDevice(cudaDevice));
+
+  return makeValResult(CudaDevicePushPop(previousDevice, /* hasPrevious= */ true));
+}
+
+#define CUDA_DEV_PUSH_POP_OR_RET(deviceIndex__, returnOnFailure__)           \
+  Result<CudaDevicePushPop> pushPopResult__ = pushCudaDevice(deviceIndex__); \
+  if (pushPopResult__.status != Status_Success) {                            \
+    return returnOnFailure__;                                                \
+  }
+
+#define CUDA_DEV_PUSH_POP_OR_RET_STATUS(deviceIndex__)                       \
+  Result<CudaDevicePushPop> pushPopResult__ = pushCudaDevice(deviceIndex__); \
+  if (pushPopResult__.status != Status_Success) {                            \
+    return pushPopResult__.status;                                           \
+  }
+
+#define CUDA_DEV_PUSH_POP_OR_RET_RESULT(deviceIndex__)                       \
+  Result<CudaDevicePushPop> pushPopResult__ = pushCudaDevice(deviceIndex__); \
+  if (pushPopResult__.status != Status_Success) {                            \
+    return {.status = pushPopResult__.status, .value = {}};                  \
+  }
+
 #endif  // SDRTEST_SRC_CUDADEVICEPUSHPOP_H_

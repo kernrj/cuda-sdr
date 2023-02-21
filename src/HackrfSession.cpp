@@ -21,17 +21,19 @@
 #include <mutex>
 #include <sstream>
 
+#include "GSErrors.h"
+#include "GSLog.h"
+
 using namespace std;
 
-#define SAFE_HRF(__cmd, __errorMsg)                                             \
-  do {                                                                          \
-    int status = (__cmd);                                                       \
-    if (status != HACKRF_SUCCESS) {                                             \
-      ostringstream msgStream;                                                  \
-      msgStream << (__errorMsg) << " - Error " << status << "("                 \
-                << hackrf_error_name(static_cast<hackrf_error>(status)) << ")"; \
-      throw runtime_error(msgStream.str());                                     \
-    }                                                                           \
+#define SAFE_HRF(__cmd, __errorMsg)                                                                            \
+  do {                                                                                                         \
+    int status = (__cmd);                                                                                      \
+    if (status != HACKRF_SUCCESS) {                                                                            \
+      GS_FAIL(                                                                                                 \
+          (__errorMsg) << " - Error " << status << "(" << hackrf_error_name(static_cast<hackrf_error>(status)) \
+                       << ")");                                                                                \
+    }                                                                                                          \
   } while (false)
 
 static mutex sessionLock;
@@ -46,14 +48,14 @@ static void cleanupAtExit() {
   }
 
   sessionCount = 0;
-  printf("hackrf_exit() while exiting\n");
+  gslog(GSLOG_INFO, "hackrf_exit() while exiting");
   hackrf_exit();
 }
 
 static void incSessionRefCount() {
   lock_guard<mutex> lock(sessionLock);
   if (sessionCount == 0) {
-    printf("hackrf_init()\n");
+    gslog(GSLOG_INFO, "hackrf_init()");
 
     SAFE_HRF(hackrf_init(), "HackRF library initialization");
 
@@ -61,11 +63,11 @@ static void incSessionRefCount() {
       int status = std::atexit(cleanupAtExit);
 
       if (status != 0) {
-        fprintf(
-            stderr,
+        gslog(
+            GSLOG_ERROR,
             "Failed to register HackRF clean-up. If the program terminates "
             "abnormally, the HackRF library will not be cleanly shutdown and "
-            "the HackRF device may need to be reset.\n");
+            "the HackRF device may need to be reset.");
       }
     }
   }
@@ -83,7 +85,7 @@ static void decSessionRefCount() {
   sessionCount--;
 
   if (sessionCount == 0) {
-    printf("hackrf_exit()\n");
+    gslog(GSLOG_INFO, "hackrf_exit()");
     hackrf_exit();
   }
 }

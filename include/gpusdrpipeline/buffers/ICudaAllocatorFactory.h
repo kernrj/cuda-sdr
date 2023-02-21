@@ -18,17 +18,18 @@
 #define GPUSDR_ICUDAALLOCATORFACTORY_H
 
 #include <cuda_runtime.h>
+#include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/buffers/IAllocator.h>
 
-class ICudaAllocatorFactory {
+class ICudaAllocatorFactory : public virtual IRef {
  public:
-  virtual ~ICudaAllocatorFactory() = default;
-
-  virtual std::shared_ptr<IAllocator> createCudaAllocator(
+  virtual Result<IAllocator> createCudaAllocator(
       int32_t cudaDevice,
       cudaStream_t cudaStream,
       size_t alignment,
-      bool useHostMemory) = 0;
+      bool useHostMemory) noexcept = 0;
+
+  ABSTRACT_IREF(ICudaAllocatorFactory);
 };
 
 #endif  // GPUSDR_ICUDAALLOCATORFACTORY_H

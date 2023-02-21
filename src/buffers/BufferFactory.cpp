@@ -1,6 +1,18 @@
-//
-// Created by Rick Kern on 1/3/23.
-//
+/*
+ * Copyright 2023 Rick Kern <kernrj@gmail.com>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 
 #include "BufferFactory.h"
 
@@ -9,19 +21,22 @@
 
 using namespace std;
 
-BufferFactory::BufferFactory(
-    const shared_ptr<IAllocator>& allocator,
-    const std::shared_ptr<IBufferRangeFactory>& bufferRangeFactory)
+BufferFactory::BufferFactory(IAllocator* allocator, IBufferRangeFactory* bufferRangeFactory) noexcept
     : mAllocator(allocator),
       mBufferRangeFactory(bufferRangeFactory) {}
 
-shared_ptr<IBuffer> BufferFactory::createBuffer(size_t size) {
-  size_t actualSize = 0;
-  const shared_ptr<uint8_t> data = mAllocator->allocate(size, &actualSize);
-
-  if (actualSize < size) {
-    THROW("Actual size of allocated buffer [" << actualSize << "] is less than the requested size [" << size << "]");
+Result<IBuffer> BufferFactory::createBuffer(size_t size) noexcept {
+  ImmutableRef<IMemory> data = unwrap(mAllocator->allocate(size));
+  if (data == nullptr) {
+    return ERR_RESULT(Status_OutOfMemory);
   }
 
-  return make_shared<OwnedBuffer>(actualSize, 0, 0, data, mBufferRangeFactory);
+  Ref<IBuffer> buffer;
+  UNWRAP_OR_FWD_RESULT(buffer, OwnedBuffer::create(0, 0, data, mBufferRangeFactory));
+
+  if (buffer == nullptr) {
+    return ERR_RESULT(Status_OutOfMemory);
+  }
+
+  return makeRefResultNonNull<IBuffer>(buffer);
 }

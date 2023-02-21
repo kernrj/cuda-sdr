@@ -18,63 +18,63 @@
 
 #include <cstring>
 #include <string>
-#include <unordered_map>
 
-#include "GSErrors.h"
+#include "Result.h"
 
 using namespace std;
 
-void BufferUtil::appendToBuffer(
-    const std::shared_ptr<IBuffer>& buffer,
-    const void* src,
-    size_t count,
-    const shared_ptr<IBufferCopier>& bufferCopier) const {
-  if (count > buffer->range()->remaining()) {
-    throw invalid_argument(
-        "Cannot copy more bytes [" + to_string(count) + "] than remain [" + to_string(buffer->range()->remaining()));
+Status BufferUtil::appendToBuffer(IBuffer* buffer, const void* src, size_t count, const IBufferCopier* bufferCopier)
+    const noexcept {
+  const size_t numRemainingBytes = buffer->range()->remaining();
+  if (count > numRemainingBytes) {
+    gslog(GSLOG_ERROR, "Cannot copy [%zu] bytes. Only [%zu] bytes remain.", count, numRemainingBytes);
+    return Status_InvalidArgument;
   }
 
-  bufferCopier->copy(buffer->writePtr(), src, count);
+  FWD_IF_ERR(bufferCopier->copy(buffer->writePtr(), src, count));
+  FWD_IF_ERR(buffer->range()->increaseEndOffset(count));
 
-  buffer->range()->increaseEndOffset(count);
+  return Status_Success;
 }
 
-void BufferUtil::readFromBuffer(
-    void* dst,
-    const shared_ptr<IBuffer>& buffer,
-    size_t count,
-    const shared_ptr<IBufferCopier>& bufferCopier) const {
-  if (count > buffer->range()->used()) {
-    throw invalid_argument(
-        SSTREAM("Cannot copy more bytes [" << count << "] than available [" << buffer->range()->used() << "]"));
+Status BufferUtil::readFromBuffer(void* dst, IBuffer* buffer, size_t count, const IBufferCopier* bufferCopier)
+    const noexcept {
+  const size_t currentNumUsedBytes = buffer->range()->used();
+  if (count > currentNumUsedBytes) {
+    gslog(GSLOG_ERROR, "Cannot copy [%zu] bytes - only [%zu] are available in the source", count, currentNumUsedBytes);
+    return Status_InvalidArgument;
   }
 
-  bufferCopier->copy(dst, buffer->readPtr(), count);
-  buffer->range()->increaseOffset(count);
+  FWD_IF_ERR(bufferCopier->copy(dst, buffer->readPtr(), count));
+  FWD_IF_ERR(buffer->range()->increaseOffset(count));
+
+  return Status_Success;
 }
 
-void BufferUtil::moveFromBuffer(
-    const shared_ptr<IBuffer>& dst,
-    const shared_ptr<IBuffer>& src,
-    size_t count,
-    const shared_ptr<IBufferCopier>& bufferCopier) const {
-  if (count > src->range()->used()) {
-    throw invalid_argument(
-        "Cannot copy more bytes [" + to_string(count) + "] than available in the source ["
-        + to_string(src->range()->used()));
-  }
+Status BufferUtil::moveFromBuffer(IBuffer* dst, IBuffer* src, size_t count, const IBufferCopier* bufferCopier)
+    const noexcept {
+  const size_t srcNumUsedBytes = src->range()->used();
+  const size_t dstNumRemainingBytes = dst->range()->remaining();
+  if (count > srcNumUsedBytes) {
+    gslog(GSLOG_ERROR, "Cannot copy [%zu] bytes - only [%zu] are available in the source", count, srcNumUsedBytes);
+    return Status_InvalidArgument;
+  } else if (count > dstNumRemainingBytes) {
+    gslog(
+        GSLOG_ERROR,
+        "Cannot copy [%zu] bytes - only [%zu] are remaining in the destination",
+        count,
+        dstNumRemainingBytes);
 
-  if (count > dst->range()->remaining()) {
-    throw invalid_argument(
-        "Cannot copy more bytes [" + to_string(count) + "] than remain in the destination ["
-        + to_string(dst->range()->remaining()));
+    return Status_InvalidArgument;
   }
 
   const uint8_t* srcPtr = src->readPtr();
   uint8_t* dstPtr = dst->writePtr();
 
-  src->range()->increaseOffset(count);
-  dst->range()->increaseEndOffset(count);
+  FWD_IF_ERR(src->range()->increaseOffset(count));
+  FWD_IF_ERR(dst->range()->increaseEndOffset(count));
 
-  bufferCopier->copy(dstPtr, srcPtr, count);
+  FWD_IF_ERR(bufferCopier->copy(dstPtr, srcPtr, count));
+
+  return Status_Success;
 }

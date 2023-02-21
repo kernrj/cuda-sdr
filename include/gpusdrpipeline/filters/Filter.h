@@ -17,16 +17,25 @@
 #ifndef SDRTEST_SRC_FILTER_H_
 #define SDRTEST_SRC_FILTER_H_
 
+#include <gpusdrpipeline/Status.h>
 #include <gpusdrpipeline/buffers/IBuffer.h>
+#include <gpusdrpipeline/Result.h>
 
-#include <memory>
-#include <string>
-#include <vector>
+class Sink;
+class Source;
+class IDriver;
 
-class Sink {
+class Node : public virtual IRef {
  public:
-  virtual ~Sink() = default;
+  virtual Sink* asSink() noexcept { return nullptr; }
+  virtual Source* asSource() noexcept { return nullptr; }
+  virtual IDriver* asDriver() noexcept { return nullptr; }
 
+  ABSTRACT_IREF(Node);
+};
+
+class Sink : public virtual Node {
+ public:
   /**
    * Returns a Buffer with the requested number of bytes available to write.
    *
@@ -36,7 +45,7 @@ class Sink {
    * The returned Buffer's mCapacity may be larger than byteCount. Any extra
    * mCapacity can be freely used.
    */
-  [[nodiscard]] virtual std::shared_ptr<IBuffer> requestBuffer(size_t port, size_t byteCount) = 0;
+  [[nodiscard]] virtual Result<IBuffer> requestBuffer(size_t port, size_t byteCount) noexcept = 0;
 
   /**
    * Commits the mInputBuffer, and specifies the number of bytes actually consumed.
@@ -51,18 +60,24 @@ class Sink {
    * Filter implementations may or may not do their processing in this method,
    * as Source::readOutput() is another option and prevents a memcpy.
    */
-  virtual void commitBuffer(size_t port, size_t byteCount) = 0;
+  [[nodiscard]] virtual Status commitBuffer(size_t port, size_t byteCount) noexcept = 0;
+  [[nodiscard]] virtual size_t preferredInputBufferSize(size_t port) noexcept {
+    (void)port;
+    return SIZE_MAX;
+  };
+
+  [[nodiscard]] Sink* asSink() noexcept override { return this; }
+
+  ABSTRACT_IREF(Sink);
 };
 
-class Source {
+class Source : public virtual Node {
  public:
-  virtual ~Source() = default;
-
   /**
    * This returns the number of bytes that will be written in the
    * next call to readOutput() for the given port.
    */
-  [[nodiscard]] virtual size_t getOutputDataSize(size_t port) = 0;
+  [[nodiscard]] virtual size_t getOutputDataSize(size_t port) noexcept = 0;
 
   /**
    * To account for vectorized optimizations, the mCapacity of the Buffer passed
@@ -72,7 +87,7 @@ class Source {
    *
    * To calculate the minimum mInputBuffer size, use getNextOutputBufferMinSize().
    */
-  [[nodiscard]] virtual size_t getOutputSizeAlignment(size_t port) = 0;
+  [[nodiscard]] virtual size_t getOutputSizeAlignment(size_t port) noexcept = 0;
 
   /**
    * To read all available data, and to account for vectorized operations, the
@@ -83,12 +98,15 @@ class Source {
    * If a Buffer passed to readOutput() is smaller than this, it may read
    * less than the available amount of data.
    */
-  [[nodiscard]] size_t getAlignedOutputDataSize(size_t port) {
+  [[nodiscard]] virtual size_t getAlignedOutputDataSize(size_t port) noexcept {
     const size_t alignment = getOutputSizeAlignment(port);
     const size_t outputDataSize = getOutputDataSize(port);
-    const size_t alignedSize = (outputDataSize + alignment - 1) / alignment * alignment;
 
-    return alignedSize;
+    if (outputDataSize > SIZE_MAX - alignment + 1) {
+      return outputDataSize / alignment * alignment;
+    } else {
+      return (outputDataSize + alignment - 1) / alignment * alignment;
+    }
   }
 
   /**
@@ -98,12 +116,15 @@ class Source {
    * However, this method can avoid a memcpy, because an internal mInputBuffer isn't
    * needed to store the processed results.
    */
-  virtual void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) = 0;
+  [[nodiscard]] virtual Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept = 0;
+
+  [[nodiscard]] Source* asSource() noexcept override { return this; }
+
+  ABSTRACT_IREF(Source);
 };
 
 class Filter : public virtual Sink, public virtual Source {
- public:
-  ~Filter() override = default;
+  ABSTRACT_IREF(Filter);
 };
 
 #endif  // SDRTEST_SRC_FILTER_H_

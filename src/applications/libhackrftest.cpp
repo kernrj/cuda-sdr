@@ -14,6 +14,7 @@
  *  limitations under the License.
  */
 
+#include <gpusdrpipeline/GSLog.h>
 #include <libhackrf/hackrf.h>
 
 #include <atomic>
@@ -26,18 +27,18 @@
 #include <stack>
 #include <string>
 
-#define SAFERF_RET(__cmd, __errorMsg)                            \
-  do {                                                           \
-    int status = (__cmd);                                        \
-    if (status != HACKRF_SUCCESS) {                              \
-      fprintf(                                                   \
-          stderr,                                                \
-          "%s - Error %s (%d)\n",                                \
-          (__errorMsg),                                          \
-          status,                                                \
-          hackrf_error_name(static_cast<hackrf_error>(status))); \
-      return 1;                                                  \
-    }                                                            \
+#define SAFERF_RET(__cmd, __errorMsg)                           \
+  do {                                                          \
+    int status = (__cmd);                                       \
+    if (status != HACKRF_SUCCESS) {                             \
+      gslog(                                                    \
+          GSLOG_ERROR,                                          \
+          "%s - Error %s (%d)",                                 \
+          (__errorMsg),                                         \
+          hackrf_error_name(static_cast<hackrf_error>(status)), \
+          status);                                              \
+      return 1;                                                 \
+    }                                                           \
   } while (false)
 
 using namespace std;
@@ -56,7 +57,7 @@ static void cleanupThings() {
 }
 
 static void exitSigHandler(int signum) {
-  printf("Caught signal %d, cleaning up.\n", signum);
+  gslog(GSLOG_INFO, "Caught signal %d, cleaning up.", signum);
   cleanupThings();
 
   if (signum == SIGINT || signum == SIGTERM) {
@@ -72,8 +73,9 @@ static int rx_callback(hackrf_transfer* transfer) {
     return 0;
   }
 
-  printf(
-      "Buffer size %d %hhd %hhd %hhd %hhd\n",
+  gslog(
+      GSLOG_INFO,
+      "Buffer size %d %hhd %hhd %hhd %hhd",
       transfer->valid_length,
       transfer->buffer[0],
       transfer->buffer[1],
@@ -98,42 +100,42 @@ int main(int argc, char** argv) {
   }
 
   runAtExit.push([]() {
-    printf("Cleaning up hackrf\n");
+    gslog(GSLOG_INFO, "Cleaning up hackrf");
     hackrf_exit();
   });
 
-  printf("HackRF was initialized. Getting device list.\n");
+  gslog(GSLOG_INFO, "HackRF was initialized. Getting device list.");
 
   hackrf_device_list_t* deviceList = hackrf_device_list();
-  printf("Device list %p\n", deviceList);
-  printf("Device count %d usb %d\n", deviceList->devicecount, deviceList->usb_devicecount);
+  gslog(GSLOG_INFO, "Device list %p", deviceList);
+  gslog(GSLOG_INFO, "Device count %d usb %d", deviceList->devicecount, deviceList->usb_devicecount);
   runAtExit.push([deviceList]() {
-    printf("Freeing device list %p\n", deviceList);
+    gslog(GSLOG_INFO, "Freeing device list %p", deviceList);
     hackrf_device_list_free(deviceList);
   });
 
   if (deviceList->devicecount <= 0) {
-    fprintf(stderr, "No HackRF devices found\n");
+    gslog(GSLOG_ERROR, "No HackRF devices found");
     return ENODEV;
   }
 
   if (deviceIndex >= deviceList->devicecount) {
-    fprintf(stderr, "Device with index [%d] does not exist. Max is %d.\n", deviceIndex, deviceList->devicecount);
+    gslog(GSLOG_ERROR, "Device with index [%d] does not exist. Max is %d.", deviceIndex, deviceList->devicecount);
 
     return ENODEV;
   }
 
   hackrf_device* device = nullptr;
   SAFERF_RET(hackrf_device_list_open(deviceList, deviceIndex, &device), "Error opening HackRF device");
-  printf("Opened device %d\n", deviceIndex);
+  gslog(GSLOG_INFO, "Opened device %d", deviceIndex);
 
   for (int i = 0; i < deviceList->devicecount; i++) {
     const char* sn = deviceList->serial_numbers[i];
-    printf("Device [%d] Serial No [%s]\n", i, sn);
+    gslog(GSLOG_INFO, "Device [%d] Serial No [%s]", i, sn);
   }
 
   runAtExit.push([device]() {
-    printf("Closing device %p\n", device);
+    gslog(GSLOG_INFO, "Closing device %p", device);
     hackrf_close(device);
   });
 
@@ -146,6 +148,6 @@ int main(int argc, char** argv) {
     wasInterruptedCv.wait(lock);
   }
 
-  printf("Done\n");
+  gslog(GSLOG_INFO, "Done");
   return 0;
 }

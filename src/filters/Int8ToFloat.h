@@ -22,17 +22,28 @@
 #include "Factories.h"
 #include "filters/BaseFilter.h"
 
-class Int8ToFloat : public BaseFilter {
+class Int8ToFloat final : public BaseFilter {
  public:
-  explicit Int8ToFloat(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories);
-  [[nodiscard]] size_t getOutputDataSize(size_t port) override;
-  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) override;
+  static Result<Filter> create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept;
+
+  [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
+  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
+  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
 
  private:
   static const size_t mAlignment;
   int32_t mCudaDevice;
   cudaStream_t mCudaStream;
+
+ private:
+  explicit Int8ToFloat(
+      int32_t cudaDevice,
+      cudaStream_t cudaStream,
+      IRelocatableResizableBufferFactory* relocatableBufferFactory,
+      IBufferSliceFactory* bufferSliceFactory,
+      IMemSet* memSet) noexcept;
+
+  REF_COUNTED(Int8ToFloat);
 };
 
 #endif  // SDRTEST_SRC_INT8TOFLOAT_H_

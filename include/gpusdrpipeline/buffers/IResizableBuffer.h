@@ -20,15 +20,17 @@
 #include <gpusdrpipeline/buffers/IBuffer.h>
 #include <gpusdrpipeline/buffers/IResizable.h>
 
-class IResizableBuffer : public virtual IBuffer, public IResizable {
+class IResizableBuffer : public IBuffer, public IResizable {
  public:
-  ~IResizableBuffer() override = default;
-
-  void ensureMinSize(size_t minSize) {
+  Status ensureMinSize(size_t minSize) noexcept {
     if (range()->capacity() < minSize) {
-      resize(minSize, nullptr);
+      return resize(minSize);
     }
+
+    return Status_Success;
   }
+
+  ABSTRACT_IREF(IResizableBuffer);
 };
 
 #endif  // GPUSDR_IRESIZABLEBUFFER_H

@@ -18,6 +18,7 @@
 #include <cuda_runtime.h>
 #include <gpusdrpipeline/CudaErrors.h>
 #include <gpusdrpipeline/Factories.h>
+#include <gpusdrpipeline/am.h>
 #include <gpusdrpipeline/filters/Filter.h>
 #include <gpusdrpipeline/fm.h>
 #include <gpusdrpipeline/util/CudaDevicePushPop.h>
@@ -36,11 +37,13 @@ using namespace std;
 static stack<function<void()>> runAtExit;
 static atomic_bool wasInterrupted(false);
 static condition_variable wasInterruptedCv;
-static mutex shutdownMutex;
 
-static constexpr bool useFileInput = true;
+static constexpr bool useFileInput = false;
+static bool aborted = false;
 
 static void cleanupThings() {
+  clog << "Cleaning up - shutting down" << endl;
+
   while (!runAtExit.empty()) {
     const auto toRun = std::move(runAtExit.top());
     runAtExit.pop();
@@ -50,20 +53,25 @@ static void cleanupThings() {
 }
 
 static void exitSigHandler(int signum) {
-  printf("Caught signal %d, cleaning up.\n", signum);
+  if (aborted) {
+    return;
+  }
+
+  gslog(GSLOG_INFO, "Caught signal %d, cleaning up.", signum);
   cleanupThings();
 
   if (signum == SIGINT || signum == SIGTERM) {
     wasInterrupted.store(true);
     wasInterruptedCv.notify_all();
   } else {
+    aborted = true;
     abort();
   }
 }
 
 static cudaStream_t createCudaStream() {
   cudaStream_t cudaStream = nullptr;
-  SAFE_CUDA(cudaStreamCreate(&cudaStream));
+  SAFE_CUDA_OR_THROW(cudaStreamCreate(&cudaStream));
 
   return cudaStream;
 }
@@ -139,7 +147,7 @@ static vector<float> createLowPassTaps(
   }
 
   if (status != RemezSuccess) {
-    THROW("Failed to generate low-pass taps: " << remezStatusToString(status));
+    GS_FAIL("Failed to generate low-pass taps: " << remezStatusToString(status));
   }
 
   taps.resize(taps.size());
@@ -159,7 +167,7 @@ static float getQuadDemodGain(float inputSampleRate, float channelWidth) {
 class NbfmTest {
  public:
   NbfmTest()
-      : factories(getFactoriesSingleton()),
+      : factories(unwrap(getFactoriesSingleton())),
         cudaDevice(0),
         cudaStream(createCudaStream()),
         mRfLowPassTaps(createLowPassTaps(
@@ -172,63 +180,75 @@ class NbfmTest {
             audioLowPassCutoffFrequency,
             audioLowPassTransitionWidth,
             audioLowPassDbAttenuation)),
-        hackrfSource(factories->getHackrfSourceFactory()->createHackrfSource(0, centerFrequency, rfSampleRate, 3)),
-        hostToDevice(
-            factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyHostToDevice, cudaDevice, cudaStream)),
-        convertHackrfInputToFloat(factories->getInt8ToFloatFactory()->createFilter(cudaDevice, cudaStream)),
-        cosineSource(factories->getCosineSourceFactory()->createCosineSource(
+        hackrfSource(unwrap(factories->getHackrfSourceFactory()->createHackrfSource(0, centerFrequency, rfSampleRate, 3))),
+        hostToDevice(unwrap(
+            factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyHostToDevice, cudaDevice, cudaStream))),
+        convertHackrfInputToFloat(unwrap(factories->getInt8ToFloatFactory()->createFilter(cudaDevice, cudaStream))),
+        cosineSource(unwrap(factories->getCosineSourceFactory()->createCosineSource(
+            SampleType_FloatComplex,
             rfSampleRate,
             centerFrequency - channelFrequency,
             cudaDevice,
-            cudaStream)),
-        multiplyRfSourceByCosine(factories->getMultiplyFactory()->createFilter(cudaDevice, cudaStream)),
-        rfLowPassFilter(factories->getFirFactory()->createFir(
-            FirType_FloatTapsComplexFloatSignal,
+            cudaStream))),
+        multiplyRfSourceByCosine(unwrap(factories->getMultiplyFactory()->createFilter(cudaDevice, cudaStream))),
+        rfLowPassFilter(unwrap(factories->getFirFactory()->createFir(
+            /* tapType= */ SampleType_Float,
+            /* elementType= */ SampleType_FloatComplex,
             rfLowPassDecimation,
             mRfLowPassTaps.data(),
             mRfLowPassTaps.size(),
             cudaDevice,
-            cudaStream)),
-        quadDemod(factories->getQuadDemodFactory()
-                      ->create(getQuadDemodGain(quadDemodInputSampleRate, channelWidth), cudaDevice, cudaStream)),
-        audioLowPassFilter(factories->getFirFactory()->createFir(
-            FirType_FloatTapsFloatSignal,
+            cudaStream))),
+        quadDemod(unwrap(factories->getQuadDemodFactory()
+                      ->create(Modulation_Fm, rfSampleRate, channelWidth, cudaDevice, cudaStream))),
+        audioLowPassFilter(unwrap(factories->getFirFactory()->createFir(
+            /* tapType= */ SampleType_Float,
+            /* elementType= */ SampleType_FloatComplex,
             audioLowPassDecimation,
             mRfLowPassTaps.data(),
             mRfLowPassTaps.size(),
             cudaDevice,
-            cudaStream)),
+            cudaStream))),
         deviceToHost(
-            factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyDeviceToHost, cudaDevice, cudaStream)),
-        floatQuadReader(factories->getFileReaderFactory()->createFileReader(inputFileName)),
-        audioFileWriter(factories->getAacFileWriterFactory()
-                            ->createAacFileWriter(outputAudioFile, audioSampleRate, outputAudioBitRate)) {
-    printf("Input file [%s]\n", inputFileName);
-    printf("Output file [%s] sample rate [%zu] bit rate [%d]\n", outputAudioFile, audioSampleRate, outputAudioBitRate);
-    printf("CUDA device [%d] stream [%p]\n", cudaDevice, cudaStream);
-    printf(
-        "Channel frequency [%f], center frequency [%f] channel width [%f]\n",
+            unwrap(factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyDeviceToHost, cudaDevice, cudaStream))),
+        floatQuadReader(unwrap(factories->getFileReaderFactory()->createFileReader(inputFileName))),
+        audioFileWriter(unwrap(
+            factories->getAacFileWriterFactory()
+                ->createAacFileWriter(outputAudioFile, audioSampleRate, outputAudioBitRate, cudaDevice, cudaStream))) {
+    gslog(GSLOG_INFO, "Input file [%s]", inputFileName);
+    gslog(
+        GSLOG_INFO,
+        "Output file [%s] sample rate [%zu] bit rate [%d]",
+        outputAudioFile,
+        audioSampleRate,
+        outputAudioBitRate);
+    gslog(GSLOG_INFO, "CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
+    gslog(
+        GSLOG_INFO,
+        "Channel frequency [%f], center frequency [%f] channel width [%f]",
         channelFrequency,
         centerFrequency,
         channelWidth);
-    printf("RF sample rate [%f]\n", rfSampleRate);
-    printf(
-        "RF Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]\n",
+    gslog(GSLOG_INFO, "RF sample rate [%f]", rfSampleRate);
+    gslog(
+        GSLOG_INFO,
+        "RF Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]",
         rfLowPassCutoffFrequency,
         rfLowPassTransitionWidth,
         rfLowPassDbAttenuation,
         rfLowPassDecimation,
         mRfLowPassTaps.size());
 
-    printf(
-        "Audio Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]\n",
+    gslog(
+        GSLOG_INFO,
+        "Audio Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]",
         audioLowPassCutoffFrequency,
         audioLowPassTransitionWidth,
         audioLowPassDbAttenuation,
         audioLowPassDecimation,
         mAudioLowPassTaps.size());
-    printf("Cosine source frequency [%f]\n", centerFrequency - channelFrequency);
-    printf("Quad demod gain [%f]\n", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
+    gslog(GSLOG_INFO, "Cosine source frequency [%f]", centerFrequency - channelFrequency);
+    gslog(GSLOG_INFO, "Quad demod gain [%f]", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
   }
 
   void start() {
@@ -243,23 +263,23 @@ class NbfmTest {
     }
   }
 
-  void doFilter(size_t stopAfterOutputSampleCount) {
+  Status doFilter(size_t stopAfterOutputSampleCount) {
     size_t wroteSampleCount = 0;
 
-    CudaDevicePushPop deviceSetter(cudaDevice);
-    vector<shared_ptr<IBuffer>> outputBuffers(1);
+    CUDA_DEV_PUSH_POP_OR_RET_STATUS(cudaDevice);
+    vector<IBuffer*> outputBuffers(1);
 
     while (wroteSampleCount < stopAfterOutputSampleCount) {
       Source* gpuFloatSource = nullptr;
 
       if (useFileInput) {
-        shared_ptr<IBuffer> samples = hostToDevice->requestBuffer(0, floatQuadReader->getAlignedOutputDataSize(0));
+        ConstRef<IBuffer> samples = unwrap(hostToDevice->requestBuffer(0, floatQuadReader->getAlignedOutputDataSize(0)));
         outputBuffers[0] = samples;
-        floatQuadReader->readOutput(outputBuffers);
-        hostToDevice->commitBuffer(0, samples->range()->used());
+        THROW_IF_ERR(floatQuadReader->readOutput(outputBuffers.data(), 1));
+        THROW_IF_ERR(hostToDevice->commitBuffer(0, samples->range()->used()));
 
         if (samples->range()->used() == 0) {
-          return;
+          return Status_Success;
         }
 
         gpuFloatSource = hostToDevice.get();
@@ -267,119 +287,128 @@ class NbfmTest {
         size_t hackrfBufferLength = hackrfSource->getAlignedOutputDataSize(0);
         const size_t hackRfInputSampleCount = hackrfBufferLength / 2;  // samples alternates between real and imaginary
 
-        shared_ptr<IBuffer> hackrfHostSamples = hostToDevice->requestBuffer(0, hackrfBufferLength);
+        ConstRef<IBuffer> hackrfHostSamples = unwrap(hostToDevice->requestBuffer(0, hackrfBufferLength));
 
         outputBuffers[0] = hackrfHostSamples;
-        hackrfSource->readOutput(outputBuffers);
-        hostToDevice->commitBuffer(0, hackrfHostSamples->range()->used());
+        THROW_IF_ERR(hackrfSource->readOutput(outputBuffers.data(), 1));
+        THROW_IF_ERR(hostToDevice->commitBuffer(0, hackrfHostSamples->range()->used()));
 
-        shared_ptr<IBuffer> s8ToFloatInputCudaBuffer =
-            convertHackrfInputToFloat->requestBuffer(0, hostToDevice->getAlignedOutputDataSize(0));
+        ConstRef<IBuffer> s8ToFloatInputCudaBuffer =
+            unwrap(convertHackrfInputToFloat->requestBuffer(0, hostToDevice->getAlignedOutputDataSize(0)));
         outputBuffers[0] = s8ToFloatInputCudaBuffer;
-        hostToDevice->readOutput(outputBuffers);
+        THROW_IF_ERR(hostToDevice->readOutput(outputBuffers.data(), 1));
 
-        convertHackrfInputToFloat->commitBuffer(0, s8ToFloatInputCudaBuffer->range()->used());
+        THROW_IF_ERR(convertHackrfInputToFloat->commitBuffer(0, s8ToFloatInputCudaBuffer->range()->used()));
         gpuFloatSource = convertHackrfInputToFloat.get();
       }
 
       const size_t multiplyInputBufferSize = gpuFloatSource->getAlignedOutputDataSize(0);
-      shared_ptr<IBuffer> rfMultiplyInput =
-          multiplyRfSourceByCosine->requestBuffer(0, gpuFloatSource->getAlignedOutputDataSize(0));
-      shared_ptr<IBuffer> cosineMultiplyInput =
-          multiplyRfSourceByCosine->requestBuffer(1, gpuFloatSource->getAlignedOutputDataSize(0));
+      ConstRef<IBuffer> rfMultiplyInput =
+          unwrap(multiplyRfSourceByCosine->requestBuffer(0, gpuFloatSource->getAlignedOutputDataSize(0)));
+      ConstRef<IBuffer> cosineMultiplyInput =
+          unwrap(multiplyRfSourceByCosine->requestBuffer(1, gpuFloatSource->getAlignedOutputDataSize(0)));
 
       size_t multiplyInputSampleCount =
           min(rfMultiplyInput->range()->remaining() / sizeof(cuComplex),
               cosineMultiplyInput->range()->remaining() / sizeof(cuComplex));
 
       outputBuffers[0] = rfMultiplyInput;
-      gpuFloatSource->readOutput(outputBuffers);
+      THROW_IF_ERR(gpuFloatSource->readOutput(outputBuffers.data(), 1));
 
       if (multiplyInputBufferSize != rfMultiplyInput->range()->used()) {
-        THROW(
+        GS_FAIL(
             "Expected source complex-float buffer size of [" << multiplyInputBufferSize << "] but got ["
                                                              << rfMultiplyInput->range()->used() << "]");
       }
 
-      multiplyRfSourceByCosine->commitBuffer(0, rfMultiplyInput->range()->used());
+      THROW_IF_ERR(multiplyRfSourceByCosine->commitBuffer(0, rfMultiplyInput->range()->used()));
 
       outputBuffers[0] = cosineMultiplyInput;
-      cosineSource->readOutput(outputBuffers);
+      THROW_IF_ERR(cosineSource->readOutput(outputBuffers.data(), 1));
 
-      multiplyRfSourceByCosine->commitBuffer(1, cosineMultiplyInput->range()->used());
+     THROW_IF_ERR( multiplyRfSourceByCosine->commitBuffer(1, cosineMultiplyInput->range()->used()));
 
-      const shared_ptr<IBuffer> rfLowPassBuffer =
-          rfLowPassFilter->requestBuffer(0, multiplyRfSourceByCosine->getAlignedOutputDataSize(0));
+      ConstRef<IBuffer> rfLowPassBuffer =
+          unwrap(rfLowPassFilter->requestBuffer(0, multiplyRfSourceByCosine->getAlignedOutputDataSize(0)));
       outputBuffers[0] = rfLowPassBuffer;
-      multiplyRfSourceByCosine->readOutput(outputBuffers);
-      rfLowPassFilter->commitBuffer(0, rfLowPassBuffer->range()->used());
+      THROW_IF_ERR(multiplyRfSourceByCosine->readOutput(outputBuffers.data(), 1));
+      THROW_IF_ERR(rfLowPassFilter->commitBuffer(0, rfLowPassBuffer->range()->used()));
 
-      const shared_ptr<IBuffer> quadDemodInputBuffer =
-          quadDemod->requestBuffer(0, rfLowPassFilter->getAlignedOutputDataSize(0));
+      ConstRef<IBuffer> quadDemodInputBuffer =
+          unwrap(quadDemod->requestBuffer(0, rfLowPassFilter->getAlignedOutputDataSize(0)));
       outputBuffers[0] = quadDemodInputBuffer;
-      rfLowPassFilter->readOutput(outputBuffers);
-      quadDemod->commitBuffer(0, quadDemodInputBuffer->range()->used());
+      THROW_IF_ERR(rfLowPassFilter->readOutput(outputBuffers.data(), 1));
+      THROW_IF_ERR(quadDemod->commitBuffer(0, quadDemodInputBuffer->range()->used()));
 
-      const shared_ptr<IBuffer> audioLowPassBuffer =
-          audioLowPassFilter->requestBuffer(0, quadDemod->getAlignedOutputDataSize(0));
+      ConstRef<IBuffer> audioLowPassBuffer =
+          unwrap(audioLowPassFilter->requestBuffer(0, quadDemod->getAlignedOutputDataSize(0)));
       outputBuffers[0] = audioLowPassBuffer;
-      quadDemod->readOutput(outputBuffers);
-      audioLowPassFilter->commitBuffer(0, audioLowPassBuffer->range()->used());
+      THROW_IF_ERR(quadDemod->readOutput(outputBuffers.data(), 1));
+      THROW_IF_ERR(audioLowPassFilter->commitBuffer(0, audioLowPassBuffer->range()->used()));
 
-      const shared_ptr<IBuffer> deviceToHostBuffer =
-          deviceToHost->requestBuffer(0, audioLowPassFilter->getAlignedOutputDataSize(0));
+      ConstRef<IBuffer> deviceToHostBuffer =
+          unwrap(deviceToHost->requestBuffer(0, audioLowPassFilter->getAlignedOutputDataSize(0)));
       outputBuffers[0] = deviceToHostBuffer;
-      audioLowPassFilter->readOutput(outputBuffers);
-      deviceToHost->commitBuffer(0, deviceToHostBuffer->range()->used());
+      THROW_IF_ERR(audioLowPassFilter->readOutput(outputBuffers.data(), 1));
+      THROW_IF_ERR(deviceToHost->commitBuffer(0, deviceToHostBuffer->range()->used()));
 
-      const shared_ptr<IBuffer> audioEncMuxInputBuffer =
-          audioFileWriter->requestBuffer(0, deviceToHost->getAlignedOutputDataSize(0));
+      ConstRef<IBuffer> audioEncMuxInputBuffer =
+          unwrap(audioFileWriter->requestBuffer(0, deviceToHost->getAlignedOutputDataSize(0)));
 
       outputBuffers[0] = audioEncMuxInputBuffer;
-      deviceToHost->readOutput(outputBuffers);
+      THROW_IF_ERR(deviceToHost->readOutput(outputBuffers.data(), 1));
 
       cudaStreamSynchronize(cudaStream);
 
       wroteSampleCount += audioEncMuxInputBuffer->range()->used() / sizeof(float);
-      audioFileWriter->commitBuffer(0, audioEncMuxInputBuffer->range()->used());
+      THROW_IF_ERR(audioFileWriter->commitBuffer(0, audioEncMuxInputBuffer->range()->used()));
     }
   }
 
  private:
   const char* const fileName98_5MHz_Fm_Wb = "/home/rick/sdr/98.5MHz.float.iq";
   const char* const fileName145_45MHz_Fm_Nb = "/home/rick/sdr/raw.bin";
-  const char* const inputFileName = fileName98_5MHz_Fm_Wb;
+  const char* const inputFileName = fileName145_45MHz_Fm_Nb;
 
   const char* const outputAudioFile = "/home/rick/sdr/allgpu.ts";
 
-  IFactories* const factories;
+  ConstRef<IFactories> factories;
   const int32_t cudaDevice;
   cudaStream_t cudaStream;
   const vector<float> mRfLowPassTaps;
   const vector<float> mAudioLowPassTaps;
-  const shared_ptr<IHackrfSource> hackrfSource;
-  const shared_ptr<Filter> hostToDevice;
-  const shared_ptr<Filter> convertHackrfInputToFloat;
-  const shared_ptr<Source> cosineSource;
-  const shared_ptr<Filter> multiplyRfSourceByCosine;
-  const shared_ptr<Filter> rfLowPassFilter;
-  const shared_ptr<Filter> quadDemod;
-  const shared_ptr<Filter> audioLowPassFilter;
-  const shared_ptr<Filter> deviceToHost;
-  const shared_ptr<Source> floatQuadReader;
-  const shared_ptr<Sink> audioFileWriter;
+  ConstRef<IHackrfSource> hackrfSource;
+  ConstRef<Filter> hostToDevice;
+  ConstRef<Filter> convertHackrfInputToFloat;
+  ConstRef<Source> cosineSource;
+  ConstRef<Filter> multiplyRfSourceByCosine;
+  ConstRef<Filter> rfLowPassFilter;
+  ConstRef<Filter> quadDemod;
+  ConstRef<Filter> audioLowPassFilter;
+  ConstRef<Filter> deviceToHost;
+  ConstRef<Source> floatQuadReader;
+  ConstRef<Sink> audioFileWriter;
 
-  /*
+  /* 145.45MHz, source file isn't working (not sure of RF sample rate)
   static constexpr float maxRfSampleRate = 20e6;
-  static constexpr float audioSampleRate = 48e3;
+  static constexpr size_t audioSampleRate = 48e3;
   static constexpr int32_t outputAudioBitRate = 128000;
   static constexpr float centerFrequency = 144e6;
   static constexpr float channelFrequency = 145.45e6;
   static constexpr float rfLowPassDbAttenuation = -60.0f;
-  static constexpr float lowPassGain = 1.0f;
+  static constexpr float audioLowPassDbAttenuation = -60.0f;
+  static constexpr float channelWidth = kNbfmChannelWidth;
+  static constexpr float rfSampleRate =
+      uint32_t(maxRfSampleRate / audioSampleRate) * audioSampleRate;  // 416 * audio sample rate
+  static constexpr size_t audioLowPassDecimation = 26;
+  static constexpr size_t rfLowPassDecimation = 16;  // 416 = 16 * 26
+  static constexpr float rfLowPassCutoffFrequency = channelWidth;
+  static constexpr float rfLowPassTransitionWidth = channelWidth / 2.0f;
+  static constexpr size_t quadDemodInputSampleRate = audioSampleRate * audioLowPassDecimation;
 */
 
-  static constexpr float maxRfSampleRate = 20e6;
+  /*
+  //98.5MHz channel (WBFM) file capture. RF sample rate 4.8MHz, center frequency 97.5MHz.
   static constexpr size_t audioSampleRate = 48e3;
   static constexpr int32_t outputAudioBitRate = 128000;
   static constexpr float centerFrequency = 97.5e6;
@@ -389,25 +418,264 @@ class NbfmTest {
   static constexpr float channelWidth = kWbfmChannelWidth;
   static constexpr size_t audioLowPassDecimation = 10;
   static constexpr size_t rfLowPassDecimation = 10;
-
   static constexpr size_t quadDemodInputSampleRate = audioSampleRate * audioLowPassDecimation;
   static constexpr float rfSampleRate = static_cast<float>(rfLowPassDecimation) * quadDemodInputSampleRate;
   static constexpr float rfLowPassCutoffFrequency = channelWidth;
   static constexpr float rfLowPassTransitionWidth = channelWidth / 2.0f;
+  */
+
+  // 98.5MHz channel (WBFM) live.
+  static constexpr float maxRfSampleRate = 19968000.0f;  // Largest multiple of 48KHz less than 20MHz, 416 * 48000
+  static constexpr size_t audioSampleRate = 48e3;
+  static constexpr int32_t outputAudioBitRate = 128000;
+  static constexpr float centerFrequency = 97.5e6;
+  static constexpr float channelFrequency = 98.5e6;
+  static constexpr float rfLowPassDbAttenuation = -60.0f;
+  static constexpr float audioLowPassDbAttenuation = -60.0f;
+  static constexpr float channelWidth = kWbfmChannelWidth;
+  static constexpr size_t audioLowPassDecimation = 16;  // 16 * 26 = 416 = RF sample rate / audio sample rate
+  static constexpr size_t rfLowPassDecimation = 26;
+  static constexpr size_t quadDemodInputSampleRate = audioSampleRate * audioLowPassDecimation;
+  static constexpr float rfSampleRate = static_cast<float>(rfLowPassDecimation) * quadDemodInputSampleRate;
+  static constexpr float rfLowPassCutoffFrequency = channelWidth;
+  static constexpr float rfLowPassTransitionWidth = channelWidth / 2.0f;
+
   static constexpr float audioLowPassTransitionWidth = audioSampleRate / 2.0f * 0.1f;
   static constexpr float audioLowPassCutoffFrequency = audioSampleRate / 2.0f - audioLowPassTransitionWidth;
 };
 
-int main(int argc, char** argv) {
+static ImmutableRef<Source> createHackrfInputPipeline(
+    IFactories* factories,
+    float tunedCenterFrequency,
+    float rfSampleRate,
+    int32_t cudaDevice,
+    cudaStream_t cudaStream) {
+  const size_t maxHackrfBuffersBeforeDropping = 3;
+  auto hackrfInput = unwrap(factories->getHackrfSourceFactory()
+                         ->createHackrfSource(0, tunedCenterFrequency, rfSampleRate, maxHackrfBuffersBeforeDropping));
+  auto hostToDevice =
+      unwrap(factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyHostToDevice, cudaDevice, cudaStream));
+  auto int8ToFloat = unwrap(factories->getInt8ToFloatFactory()->createFilter(cudaDevice, cudaStream));
+
+  auto driver = unwrap(factories->getFilterDriverFactory()->createFilterDriver());
+  driver->connect(hackrfInput, 0, hostToDevice, 0);
+  driver->connect(hostToDevice, 0, int8ToFloat, 0);
+  driver->setDriverOutput(int8ToFloat);
+
+  driver->setupNode(hackrfInput, "Get HackRF samples");
+  driver->setupNode(hostToDevice, "Copy HackRF samples to GPU memory");
+  driver->setupNode(int8ToFloat, "Convert HackRF complex int8 format to complex float");
+
+  runAtExit.emplace([hackrfInput]() { hackrfInput->releaseDevice(); });
+
+  return ImmutableRef<Source>(driver);
+}
+
+static ImmutableRef<Sink> createAacFileOutputPipeline(
+    IFactories* factories,
+    Ref<IReadByteCountMonitor>* outputByteCountWritten,
+    const char* outputFileName,
+    size_t audioSampleRate,
+    size_t outputBitRate,
+    int32_t cudaDevice,
+    cudaStream_t cudaStream) {
+  auto deviceToHost = unwrap(factories->getReadByteCountMonitorFactory()->create(
+      unwrap(factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyDeviceToHost, cudaDevice, cudaStream))));
+  auto audioOutput = unwrap(factories->getAacFileWriterFactory()
+                         ->createAacFileWriter(outputFileName, audioSampleRate, outputBitRate, cudaDevice, cudaStream));
+
+  auto driver = unwrap(factories->getFilterDriverFactory()->createFilterDriver());
+
+  driver->setDriverInput(deviceToHost);
+  driver->connect(deviceToHost, 0, audioOutput, 0);
+
+  driver->setupNode(deviceToHost, "Copy audio samples from GPU to System Memory");
+  driver->setupNode(audioOutput, "Encode and mux audio to a file");
+
+  *outputByteCountWritten = deviceToHost;
+
+  return ImmutableRef<Sink>(driver);
+}
+
+int doAm();
+int doFm();
+
+int main(int argc, char** argv) { return doAm(); }
+
+int doAm() {
   atexit(cleanupThings);
+  set_terminate(cleanupThings);
   signal(SIGSEGV, &exitSigHandler);
   signal(SIGINT, &exitSigHandler);
   signal(SIGTERM, &exitSigHandler);
+  signal(SIGABRT, &exitSigHandler);
 
   const size_t stopAfterOutputAudioSampleCount = 48000 * 60;
+  /*
+    auto nbfmTest = NbfmTest();
+    nbfmTest.start();
+    nbfmTest.doFilter(stopAfterOutputAudioSampleCount);
+    nbfmTest.stop();
+    */
 
-  auto nbfmTest = NbfmTest();
-  nbfmTest.start();
-  nbfmTest.doFilter(stopAfterOutputAudioSampleCount);
-  nbfmTest.stop();
+  auto factories = unwrap(getFactoriesSingleton());
+  const auto modulation = Modulation_Am;
+  const size_t audioSampleRate = 48000;
+  const size_t rfLowPassDecim = 4;
+  const size_t audioLowPassDecim = 10;
+  const float rfSampleRate = audioSampleRate * audioLowPassDecim * rfLowPassDecim;
+  const auto tunedCenterFrequency = 1700e3;
+  const auto channelFrequency = 1400e3;
+  const auto rfLowPassDbAttenuation = -60.0f;
+  const auto audioLowPassDbAttenuation = -60.0f;
+  const auto channelWidth = kAmChannelBandwidth;
+  const auto fskDevationIfFm = 0.0f;
+  const int32_t cudaDevice = 0;
+  cudaStream_t cudaStream = createCudaStream();
+  const char* const outputFileName = "/home/rick/sdr/am.ts";
+  const size_t outputBitRate = 128000;
+
+  Ref<Source> inputPipeline;
+  if (useFileInput) {
+  } else {
+    inputPipeline = createHackrfInputPipeline(factories, tunedCenterFrequency, rfSampleRate, cudaDevice, cudaStream);
+  }
+
+  Ref<IReadByteCountMonitor> readByteCountMonitor;
+  ImmutableRef<Sink> outputPipeline = createAacFileOutputPipeline(
+      factories,
+      &readByteCountMonitor,
+      outputFileName,
+      audioSampleRate,
+      outputBitRate,
+      cudaDevice,
+      cudaStream);
+
+  auto rfToAudio = factories->getRfToPcmAudioFactory()->create(
+      rfSampleRate,
+      modulation,
+      rfLowPassDecim,
+      audioLowPassDecim,
+      tunedCenterFrequency,
+      channelFrequency,
+      channelWidth,
+      fskDevationIfFm,
+      rfLowPassDbAttenuation,
+      audioLowPassDbAttenuation,
+      cudaDevice,
+      cudaStream);
+
+  auto driver = unwrap(factories->getSteppingDriverFactory()->createSteppingDriver());
+
+  driver->connect(inputPipeline.get(), 0, rfToAudio, 0);
+  driver->connect(rfToAudio, 0, outputPipeline, 0);
+
+  driver->setupNode(inputPipeline.get(), "RF Input Pipeline");
+  driver->setupNode(rfToAudio, "Convert RF signal to audio");
+  driver->setupNode(outputPipeline, "Audio Output Pipeline");
+
+  const size_t maxSampleCount = audioSampleRate * 60;
+
+  size_t itCount = 0;
+  while (readByteCountMonitor->getByteCountRead(0) / sizeof(float) < maxSampleCount) {
+    driver->doFilter();
+
+    /*
+    itCount++;
+
+    if (itCount == 100) {
+      break;
+    }*/
+  }
+
+  return 0;
+}
+
+int doFm() {
+  atexit(cleanupThings);
+  set_terminate(cleanupThings);
+  signal(SIGSEGV, &exitSigHandler);
+  signal(SIGINT, &exitSigHandler);
+  signal(SIGTERM, &exitSigHandler);
+  signal(SIGABRT, &exitSigHandler);
+
+  const size_t stopAfterOutputAudioSampleCount = 48000 * 60;
+  /*
+    auto nbfmTest = NbfmTest();
+    nbfmTest.start();
+    nbfmTest.doFilter(stopAfterOutputAudioSampleCount);
+    nbfmTest.stop();
+    */
+
+  auto factories = unwrap(getFactoriesSingleton());
+  const auto modulation = Modulation_Fm;
+  const size_t audioSampleRate = 48000;
+  const size_t rfLowPassDecim = 26;
+  const size_t audioLowPassDecim = 16;
+  const float rfSampleRate = audioSampleRate * audioLowPassDecim * rfLowPassDecim;
+  const auto tunedCenterFrequency = 97e6;
+  const auto channelFrequency = 98.5e6;
+  const auto rfLowPassDbAttenuation = -60.0f;
+  const auto audioLowPassDbAttenuation = -60.0f;
+  const auto channelWidth = kWbfmChannelWidth;
+  const auto fskDevationIfFm = kWbfmFrequencyDeviation;
+  const int32_t cudaDevice = 0;
+  cudaStream_t cudaStream = createCudaStream();
+  const char* const outputFileName = "/home/rick/sdr/audio.ts";
+  const size_t outputBitRate = 128000;
+
+  Ref<Source> inputPipeline;
+  if (useFileInput) {
+  } else {
+    inputPipeline = createHackrfInputPipeline(factories, tunedCenterFrequency, rfSampleRate, cudaDevice, cudaStream);
+  }
+
+  Ref<IReadByteCountMonitor> readByteCountMonitor;
+  ImmutableRef<Sink> outputPipeline = createAacFileOutputPipeline(
+      factories,
+      &readByteCountMonitor,
+      outputFileName,
+      audioSampleRate,
+      outputBitRate,
+      cudaDevice,
+      cudaStream);
+
+  auto rfToAudio = factories->getRfToPcmAudioFactory()->create(
+      rfSampleRate,
+      modulation,
+      rfLowPassDecim,
+      audioLowPassDecim,
+      tunedCenterFrequency,
+      channelFrequency,
+      channelWidth,
+      fskDevationIfFm,
+      rfLowPassDbAttenuation,
+      audioLowPassDbAttenuation,
+      cudaDevice,
+      cudaStream);
+
+  auto driver = unwrap(factories->getSteppingDriverFactory()->createSteppingDriver());
+
+  driver->connect(inputPipeline.get(), 0, rfToAudio, 0);
+  driver->connect(rfToAudio, 0, outputPipeline, 0);
+
+  driver->setupNode(inputPipeline.get(), "RF Input Pipeline");
+  driver->setupNode(rfToAudio, "Convert RF signal to audio");
+  driver->setupNode(outputPipeline, "Audio Output Pipeline");
+
+  const size_t maxSampleCount = audioSampleRate * 60;
+
+  size_t itCount = 0;
+  while (readByteCountMonitor->getByteCountRead(0) / sizeof(float) < maxSampleCount) {
+    driver->doFilter();
+
+    /*
+    itCount++;
+
+    if (itCount == 100) {
+      break;
+    }*/
+  }
+
+  return 0;
 }

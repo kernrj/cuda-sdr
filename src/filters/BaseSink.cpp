@@ -23,51 +23,49 @@
 using namespace std;
 
 BaseSink::BaseSink(
-    const std::shared_ptr<IRelocatableResizableBufferFactory>& relocatableResizableBufferFactory,
-    const std::shared_ptr<IBufferSliceFactory>& slicedBufferFactory,
+    IRelocatableResizableBufferFactory* relocatableResizableBufferFactory,
+    IBufferSliceFactory* slicedBufferFactory,
     size_t inputPortCount,
-    const std::shared_ptr<IMemSet>& memSet)
-    : mRelocatableResizableBufferFactory(relocatableResizableBufferFactory),
+    IMemSet* memSet)
+    : mInputPortCount(inputPortCount),
       mSlicedBufferFactory(slicedBufferFactory),
-      mInputPorts(createInputPorts(inputPortCount)),
-      mMemSet(memSet) {}
+      mMemSet(memSet),
+      mRelocatableResizableBufferFactory(relocatableResizableBufferFactory) {}
 
-vector<BaseSink::InputPort> BaseSink::createInputPorts(size_t inputPortCount) {
-  vector<InputPort> inputPorts(inputPortCount);
+vector<BaseSink::InputPort> BaseSink::createInputPorts() {
+  vector<InputPort> inputPorts;
 
-  for (size_t i = 0; i < inputPortCount; i++) {
-    inputPorts[i] = InputPort {
+  const size_t defaultBufferSize = 8192;
+  for (size_t i = 0; i < mInputPortCount; i++) {
+    inputPorts.emplace_back(InputPort {
+        .inputBuffer = unwrap(mRelocatableResizableBufferFactory->createRelocatableBuffer(defaultBufferSize)),
         .bufferCheckedOut = false,
-    };
+    });
   }
 
   return inputPorts;
 }
 
-shared_ptr<IBuffer> BaseSink::requestBuffer(size_t port, size_t numBytes) {
-  if (port >= mInputPorts.size()) {
-    throw runtime_error("Cannot request buffer - Input port [" + to_string(port) + "] is out of range.");
-  }
+Result<IBuffer> BaseSink::requestBuffer(size_t port, size_t numBytes) noexcept {
+  GS_REQUIRE_OR_RET_RESULT_FMT(
+      port < mInputPorts.size(),
+      "Cannot request buffer. Input port [%zu] is out of range.",
+      port);
 
   InputPort& inputPort = mInputPorts[port];
 
-  if (inputPort.bufferCheckedOut) {
-    throw runtime_error("Cannot request buffer - it is already checked out");
-  }
-
-  if (inputPort.inputBuffer == nullptr) {
-    inputPort.inputBuffer = mRelocatableResizableBufferFactory->createRelocatableBuffer(numBytes);
-  }
+  GS_REQUIRE_OR_RET_RESULT(!inputPort.bufferCheckedOut, "Cannot request buffer - it is already checked out");
 
   auto& buffer = inputPort.inputBuffer;
 
   if (buffer->range()->remaining() < numBytes) {
-    buffer->resize(buffer->range()->endOffset() + numBytes, nullptr);
+    buffer->resize(buffer->range()->endOffset() + numBytes);
   }
 
   inputPort.bufferCheckedOut = true;
 
-  auto requestedBuffer = mSlicedBufferFactory->sliceRemaining(buffer);
+  IBuffer* requestedBuffer;
+  UNWRAP_OR_FWD_RESULT(requestedBuffer, mSlicedBufferFactory->sliceRemaining(buffer));
 
 #ifdef DEBUG
   if (mMemSet != nullptr) {
@@ -75,68 +73,81 @@ shared_ptr<IBuffer> BaseSink::requestBuffer(size_t port, size_t numBytes) {
   }
 #endif  // DEBUG
 
-  return requestedBuffer;
+  return makeRefResultNonNull(requestedBuffer);
 }
 
-void BaseSink::commitBuffer(size_t port, size_t numBytes) {
-  if (port >= mInputPorts.size()) {
-    throw runtime_error("Cannot commit buffer - Input port [" + to_string(port) + "] is out of range.");
-  }
+Status BaseSink::commitBuffer(size_t port, size_t numBytes) noexcept {
+  GS_REQUIRE_OR_RET_STATUS_FMT(
+      port < mInputPorts.size(),
+      "Cannot commit buffer. Input port [%zu] is out of range",
+      port);
 
   InputPort& inputPort = mInputPorts[port];
 
-  if (!inputPort.bufferCheckedOut) {
-    throw runtime_error("Cannot commit buffer - it was not checked out");
-  } else if (numBytes > inputPort.inputBuffer->range()->remaining()) {
-    throw runtime_error("Cannot commit buffer - the number of bytes is greater than its capacity.");
-  }
+  GS_REQUIRE_OR_RET_STATUS(inputPort.bufferCheckedOut, "Cannot commit buffer - it was not checked out");
+  GS_REQUIRE_OR_RET_STATUS(
+      numBytes <= inputPort.inputBuffer->range()->remaining(),
+      "Cannot commit buffer - the committed number of bytes exceeds its capacity");
+  FWD_IF_ERR(inputPort.inputBuffer->range()->increaseEndOffset(numBytes));
 
-  inputPort.inputBuffer->range()->increaseEndOffset(numBytes);
   inputPort.bufferCheckedOut = false;
+
+  return Status_Success;
 }
 
-shared_ptr<IBuffer> BaseSink::getPortInputBuffer(size_t port) {
-  if (port >= mInputPorts.size()) {
-    throw runtime_error("Cannot get input buffer - Input port [" + to_string(port) + "] is out of range.");
-  }
+Result<IBuffer> BaseSink::getPortInputBuffer(size_t port) noexcept {
+  FWD_IN_RESULT_IF_ERR(ensureInputPortsInit());
+  GS_REQUIRE_OR_RET_RESULT_FMT(
+      port < mInputPorts.size(),
+      "Cannot get input buffer - Input port [%zu] is out of range",
+      port);
 
   auto& inputPort = mInputPorts[port];
 
-  if (inputPort.bufferCheckedOut) {
-    throw runtime_error("Cannot get input buffer - buffer is checked out.");
-  }
+  GS_REQUIRE_OR_RET_RESULT(!inputPort.bufferCheckedOut, "Cannot get input buffer - buffer is checked out");
 
-  return mInputPorts[port].inputBuffer;
+  return makeRefResultNonNull<IBuffer>(mInputPorts[port].inputBuffer);
 }
 
-shared_ptr<const IBuffer> BaseSink::getPortInputBuffer(size_t port) const {
-  if (port >= mInputPorts.size()) {
-    throw runtime_error("Cannot get input buffer - Input port [" + to_string(port) + "] is out of range.");
-  }
+Result<const IBuffer> BaseSink::getPortInputBuffer(size_t port) const noexcept {
+  GS_REQUIRE_OR_RET_RESULT_FMT(
+      port < mInputPorts.size(),
+      "Cannot get input buffer - Input port [%zu] is out of range",
+      port);
 
   auto& inputPort = mInputPorts[port];
 
-  if (inputPort.bufferCheckedOut) {
-    throw runtime_error("Cannot get input buffer - buffer is checked out.");
-  }
+  GS_REQUIRE_OR_RET_RESULT(!inputPort.bufferCheckedOut, "Cannot get input buffer - buffer is checked out");
 
-  return mInputPorts[port].inputBuffer;
+  return makeRefResultNonNull<const IBuffer>(mInputPorts[port].inputBuffer);
 }
 
-void BaseSink::consumeInputBytesAndMoveUsedToStart(size_t port, size_t numBytes) {
-  if (port >= mInputPorts.size()) {
-    throw runtime_error("Cannot get input buffer - Input port [" + to_string(port) + "] is out of range.");
-  }
+Status BaseSink::consumeInputBytesAndMoveUsedToStart(size_t port, size_t numBytes) noexcept {
+  FWD_IF_ERR(ensureInputPortsInit());
+  GS_REQUIRE_OR_RET_STATUS_FMT(
+      port < mInputPorts.size(),
+      "Cannot get input buffer - Input port [%zu] is out of range",
+      port);
 
   auto& inputBuffer = mInputPorts[port].inputBuffer;
   const size_t offset = inputBuffer == nullptr ? 0 : inputBuffer->range()->offset();
 
   if (numBytes == 0 && offset == 0) {
-    return;
-  } else if (inputBuffer == nullptr) {
-    THROW("Cannot consume data - no buffer has been created");
+    return Status_Success;
   }
 
-  inputBuffer->range()->increaseOffset(numBytes);
-  inputBuffer->relocateUsedToStart();
+  GS_REQUIRE_OR_RET(inputBuffer != nullptr, "Cannot consume data - no buffer has been created", Status_InvalidState);
+
+  FWD_IF_ERR(inputBuffer->range()->increaseOffset(numBytes));
+  FWD_IF_ERR(inputBuffer->relocateUsedToStart());
+
+  return Status_Success;
+}
+
+Status BaseSink::ensureInputPortsInit() noexcept {
+  if (mInputPorts.size() < mInputPortCount) {
+    DO_OR_RET_STATUS(mInputPorts = createInputPorts());
+  }
+
+  return Status_Success;
 }

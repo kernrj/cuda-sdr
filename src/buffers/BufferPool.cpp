@@ -18,65 +18,86 @@
 
 using namespace std;
 
-BufferPool::BufferPool(size_t maxBufferCount, size_t bufferSize, const shared_ptr<IBufferFactory>& bufferFactory)
+class PoolBuffer final : public IBuffer {
+ public:
+  PoolBuffer(IBuffer* wrappedBuffer, const shared_ptr<queue<ImmutableRef<IBuffer>>>& availableBuffers)
+      : mWrappedBuffer(wrappedBuffer),
+        mAvailableBuffers(availableBuffers) {}
+
+  [[nodiscard]] uint8_t* base() noexcept final { return mWrappedBuffer->base(); }
+  [[nodiscard]] const uint8_t* base() const noexcept final { return mWrappedBuffer->base(); }
+  [[nodiscard]] IBufferRange* range() noexcept final { return mWrappedBuffer->range(); }
+  [[nodiscard]] const IBufferRange* range() const noexcept final { return mWrappedBuffer->range(); }
+
+ private:
+  const RefCt<PoolBuffer> mRefCt {this, onRefCountZero};
+  ConstRef<IBuffer> mWrappedBuffer;
+  const weak_ptr<queue<ImmutableRef<IBuffer>>> mAvailableBuffers;
+
+ private:
+  ~PoolBuffer() final {
+    const auto availableBuffersStrong = mAvailableBuffers.lock();
+    if (availableBuffersStrong != nullptr) {
+      availableBuffersStrong->push(mWrappedBuffer);
+    }
+  }
+
+  void ref() const noexcept final { mRefCt.ref(); }
+  void unref() const noexcept final { mRefCt.unref(); }
+
+  static void onRefCountZero(PoolBuffer* poolBuffer) noexcept {
+    poolBuffer->mWrappedBuffer->range()->clearRange();
+    delete poolBuffer;  // Destructor returns it to mAvailableBuffers.
+  }
+};
+
+BufferPool::BufferPool(size_t maxBufferCount, size_t bufferSize, IBufferFactory* bufferFactory)
     : mMaxBufferCount(maxBufferCount),
       mBufferSize(bufferSize),
       mBufferFactory(bufferFactory),
-      mAvailableBuffers(make_shared<queue<shared_ptr<IBuffer>>>()) {}
+      mAvailableBuffers(make_shared<queue<ImmutableRef<IBuffer>>>()) {}
 
-size_t BufferPool::getBufferSize() const { return mBufferSize; }
+size_t BufferPool::getBufferSize() const noexcept { return mBufferSize; }
 
-shared_ptr<IBuffer> BufferPool::getBuffer() {
+Result<IBuffer> BufferPool::getBuffer() noexcept {
   unique_lock<mutex> lock(mMutex);
 
-  optional<shared_ptr<IBuffer>> buffer = tryGetBufferLocked();
+  IBuffer* buffer;
+  UNWRAP_OR_FWD_RESULT(buffer, tryGetBufferLocked());
 
-  while (!buffer.has_value()) {
+  while (buffer == nullptr) {
     mBufferReturnedCv.wait(lock);
-    buffer = tryGetBufferLocked();
+    UNWRAP_OR_FWD_RESULT(buffer, tryGetBufferLocked());
   }
 
-  return buffer.value();
+  return makeRefResultNonNull(buffer);
 }
 
-std::optional<std::shared_ptr<IBuffer>> BufferPool::tryGetBuffer() {
+Result<IBuffer> BufferPool::tryGetBuffer() noexcept {
   lock_guard<mutex> lock(mMutex);
   return tryGetBufferLocked();
 }
 
-std::optional<std::shared_ptr<IBuffer>> BufferPool::tryGetBufferLocked() {
+Result<IBuffer> BufferPool::tryGetBufferLocked() noexcept {
   if (mAvailableBuffers->empty() && mAllBuffers.size() < mMaxBufferCount) {
-    shared_ptr<IBuffer> buffer = mBufferFactory->createBuffer(mBufferSize);
-    mAllBuffers.push_back(buffer);
-    mAvailableBuffers->push(buffer);
+    IBuffer* buffer;
+    UNWRAP_OR_FWD_RESULT(buffer, mBufferFactory->createBuffer(mBufferSize));
+
+    ImmutableRef<IBuffer> bufferRef(buffer);
+    mAllBuffers.push_back(bufferRef);
+    mAvailableBuffers->push(bufferRef);
   }
 
   if (mAvailableBuffers->empty()) {
     return {};
   }
 
-  shared_ptr<IBuffer> buffer = mAvailableBuffers->front();
+  ConstRef<IBuffer> buffer = mAvailableBuffers->front();
   mAvailableBuffers->pop();
 
-  return createSpWrapperToReturnToPool(buffer);
+  return createWrapperToReturnToPool(buffer);
 }
 
-std::shared_ptr<IBuffer> BufferPool::createSpWrapperToReturnToPool(const shared_ptr<IBuffer>& originalBuffer) {
-  weak_ptr<queue<shared_ptr<IBuffer>>> availableBuffersWeak = mAvailableBuffers;
-  auto deleter = [availableBuffersWeak, originalBuffer](IBuffer* rawBuffer) {
-    auto availableBuffers = availableBuffersWeak.lock();
-
-    if (availableBuffers == nullptr) {
-      return;
-    }
-
-    originalBuffer->range()->clearRange();
-    availableBuffers->push(originalBuffer);
-  };
-
-  /*
-   * deleter holds the original shared_ptr<Buffer>. The Buffer won't deallocate if this BufferPool is deallocated
-   * before the returned shared_ptr.
-   */
-  return {originalBuffer.get(), deleter};
+Result<IBuffer> BufferPool::createWrapperToReturnToPool(IBuffer* originalBuffer) {
+  return makeRefResultNonNull<IBuffer>(new (nothrow) PoolBuffer(originalBuffer, mAvailableBuffers));
 }

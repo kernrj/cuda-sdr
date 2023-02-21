@@ -14,27 +14,37 @@
  *  limitations under the License.
  */
 
-#ifndef GPUSDR_SRC_QUADDEMOD_H_
-#define GPUSDR_SRC_QUADDEMOD_H_
+#ifndef GPUSDR_SRC_QUADFMDEMOD_H_
+#define GPUSDR_SRC_QUADFMDEMOD_H_
 
 #include <cuda_runtime.h>
 
 #include "Factories.h"
 #include "filters/BaseFilter.h"
 
-class QuadDemod : public BaseFilter {
+class QuadFmDemod final : public BaseFilter {
  public:
-  QuadDemod(float gain, int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories);
-  ~QuadDemod() override = default;
+  static Result<Filter> create(float gain, int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept;
 
-  [[nodiscard]] size_t getOutputDataSize(size_t port) override;
-  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) override;
+  [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
+  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
+  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
 
  private:
   const int32_t mCudaDevice;
   cudaStream_t mCudaStream;
   const float mGain;
+
+ private:
+  QuadFmDemod(
+      float gain,
+      int32_t cudaDevice,
+      cudaStream_t cudaStream,
+      IRelocatableResizableBufferFactory* relocatableBufferFactory,
+      IBufferSliceFactory* bufferSliceFactory,
+      IMemSet* memSet) noexcept;
+
+  REF_COUNTED(QuadFmDemod);
 };
 
-#endif  // GPUSDR_SRC_QUADDEMOD_H_
+#endif  // GPUSDR_SRC_QUADFMDEMOD_H_

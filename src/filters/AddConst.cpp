@@ -24,33 +24,73 @@ using namespace std;
 
 const size_t AddConst::mAlignment = 32;
 
-AddConst::AddConst(float addConst, int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories)
-    : BaseFilter(
-        factories->getRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false),
-        factories->getBufferSliceFactory(),
-        1,
-        factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream)),
+Result<Filter> AddConst::create(
+    float addValueToMagnitude,
+    int32_t cudaDevice,
+    cudaStream_t cudaStream,
+    IFactories* factories) noexcept {
+  Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
+  ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
+  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
+
+  UNWRAP_OR_FWD_RESULT(
+      relocatableCudaBufferFactory,
+      factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
+
+  return makeRefResultNonNull<Filter>(new (nothrow) AddConst(
+      addValueToMagnitude,
+      cudaDevice,
+      cudaStream,
+      relocatableCudaBufferFactory.get(),
+      bufferSliceFactory.get(),
+      memSet.get()));
+}
+
+AddConst::AddConst(
+    float addConst,
+    int32_t cudaDevice,
+    cudaStream_t cudaStream,
+    IRelocatableResizableBufferFactory* relocatableBufferFactory,
+    IBufferSliceFactory* bufferSliceFactory,
+    IMemSet* memSet) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
       mAddConst(addConst),
       mCudaDevice(cudaDevice),
       mCudaStream(cudaStream) {}
 
-size_t AddConst::getOutputDataSize(size_t port) { return getAvailableNumInputElements() * sizeof(float); }
-size_t AddConst::getAvailableNumInputElements() const { return getPortInputBuffer(0)->range()->used() / sizeof(float); }
-size_t AddConst::getOutputSizeAlignment(size_t port) { return mAlignment * sizeof(float); }
+size_t AddConst::getOutputDataSize(size_t port) noexcept {
+  GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
+  return getAvailableNumInputElements() * sizeof(float);
+}
 
-void AddConst::readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) {
-  if (portOutputs.empty()) {
-    throw runtime_error("One output port is required");
+size_t AddConst::getAvailableNumInputElements() const noexcept {
+  Ref<const IBuffer> inputBuffer;
+  UNWRAP_OR_RETURN(inputBuffer, getPortInputBuffer(0), 0);
+
+  return inputBuffer->range()->used() / sizeof(float);
+}
+
+size_t AddConst::getOutputSizeAlignment(size_t port) noexcept {
+  GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
+  return mAlignment * sizeof(float);
+}
+
+Status AddConst::readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept {
+  if (numPorts == 0) {
+    gslog(GSLOG_ERROR, "One output port is required");
+    return Status_InvalidArgument;
   }
 
-  const auto inputBuffer = getPortInputBuffer(0);
-  const auto& outputBuffer = portOutputs[0];
+  Ref<IBuffer> inputBuffer;
+  UNWRAP_OR_FWD_STATUS(inputBuffer, getPortInputBuffer(0));
+  const auto outputBuffer = portOutputBuffers[0];
 
   const size_t numInputElements = getAvailableNumInputElements();
   const size_t maxNumOutputElements = outputBuffer->range()->remaining() / sizeof(float);
   const size_t processNumElements = min(numInputElements, maxNumOutputElements);
 
-  SAFE_CUDA(gsdrAddConstFF(
+  SAFE_CUDA_OR_RET_STATUS(gsdrAddConstFF(
       inputBuffer->readPtr<float>(),
       mAddConst,
       outputBuffer->writePtr<float>(),
@@ -59,6 +99,8 @@ void AddConst::readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutpu
       mCudaStream));
 
   const size_t writtenNumBytes = processNumElements * sizeof(float);
-  outputBuffer->range()->increaseEndOffset(writtenNumBytes);
-  consumeInputBytesAndMoveUsedToStart(0, writtenNumBytes);
+  FWD_IF_ERR(outputBuffer->range()->increaseEndOffset(writtenNumBytes));
+  FWD_IF_ERR(consumeInputBytesAndMoveUsedToStart(0, writtenNumBytes));
+
+  return Status_Success;
 }

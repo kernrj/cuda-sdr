@@ -17,24 +17,26 @@
 #ifndef GPUSDR_RELOCATABLERESIZABLEBUFFERFACTORY_H
 #define GPUSDR_RELOCATABLERESIZABLEBUFFERFACTORY_H
 
+#include "Factories.h"
 #include "buffers/IAllocator.h"
 #include "buffers/IBufferCopier.h"
 #include "buffers/IBufferRangeFactory.h"
 #include "buffers/IRelocatableResizableBufferFactory.h"
 
-class RelocatableResizableBufferFactory : public IRelocatableResizableBufferFactory {
+class RelocatableResizableBufferFactory final : public IRelocatableResizableBufferFactory {
  public:
-  RelocatableResizableBufferFactory(
-      const std::shared_ptr<IAllocator>& allocator,
-      const std::shared_ptr<IBufferCopier>& bufferCopier,
-      const std::shared_ptr<IBufferRangeFactory>& bufferRangeFactory);
-  ~RelocatableResizableBufferFactory() override = default;
-  std::shared_ptr<IRelocatableResizableBuffer> createRelocatableBuffer(size_t size) override;
+  explicit RelocatableResizableBufferFactory(
+      IAllocator* allocator,
+      const IBufferCopier* bufferCopier,
+      const IBufferRangeFactory* bufferRangeFactory) noexcept;
+  Result<IRelocatableResizableBuffer> createRelocatableBuffer(size_t size) const noexcept final;
 
  private:
-  const std::shared_ptr<IAllocator> mAllocator;
-  const std::shared_ptr<IBufferCopier> mBufferCopier;
-  const std::shared_ptr<IBufferRangeFactory> mBufferRangeFactory;
+  ConstRef<IAllocator> mAllocator;
+  ConstRef<const IBufferCopier> mBufferCopier;
+  ConstRef<const IBufferRangeFactory> mBufferRangeFactory;
+
+  REF_COUNTED(RelocatableResizableBufferFactory);
 };
 
 #endif  // GPUSDR_RELOCATABLERESIZABLEBUFFERFACTORY_H

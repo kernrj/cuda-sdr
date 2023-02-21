@@ -1,16 +1,31 @@
-//
-// Created by Rick Kern on 1/5/23.
-//
+/*
+ * Copyright 2023 Rick Kern <kernrj@gmail.com>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 
 #ifndef GPUSDR_BASESINK_H
 #define GPUSDR_BASESINK_H
 
+#include <gpusdrpipeline/Factories.h>
+#include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/buffers/IBufferSliceFactory.h>
+#include <gpusdrpipeline/buffers/IMemSet.h>
 #include <gpusdrpipeline/buffers/IRelocatableResizableBuffer.h>
 #include <gpusdrpipeline/buffers/IRelocatableResizableBufferFactory.h>
 #include <gpusdrpipeline/filters/Filter.h>
 
-#include "buffers/IMemSet.h"
+#include <vector>
 
 /**
  * Provides requestBuffer() and commitBuffer() methods.
@@ -18,39 +33,45 @@
 class BaseSink : public virtual Sink {
  public:
   struct InputPort {
-    std::shared_ptr<IRelocatableResizableBuffer> inputBuffer;
+    ConstRef<IRelocatableResizableBuffer> inputBuffer;
     bool bufferCheckedOut;
   };
 
  public:
-  BaseSink(
-      const std::shared_ptr<IRelocatableResizableBufferFactory>& relocatableResizableBufferFactory,
-      const std::shared_ptr<IBufferSliceFactory>& slicedBufferFactory,
-      size_t inputPortCount,
-      const std::shared_ptr<IMemSet>& memSet = nullptr);
-  ~BaseSink() override = default;
+  BaseSink() = delete;
 
-  [[nodiscard]] std::shared_ptr<IBuffer> requestBuffer(size_t port, size_t numBytes) override;
-  void commitBuffer(size_t port, size_t numBytes) override;
+  [[nodiscard]] Result<IBuffer> requestBuffer(size_t port, size_t numBytes) noexcept override;
+  [[nodiscard]] Status commitBuffer(size_t port, size_t byteCount) noexcept override;
 
  protected:
-  [[nodiscard]] std::shared_ptr<IBuffer> getPortInputBuffer(size_t port);
-  [[nodiscard]] std::shared_ptr<const IBuffer> getPortInputBuffer(size_t port) const;
+  BaseSink(
+      IRelocatableResizableBufferFactory* relocatableResizableBufferFactory,
+      IBufferSliceFactory* slicedBufferFactory,
+      size_t inputPortCount,
+      IMemSet* memSet = nullptr);
+
+  ~BaseSink() override = default;
+
+ protected:
+  [[nodiscard]] Result<IBuffer> getPortInputBuffer(size_t port) noexcept;
+  [[nodiscard]] Result<const IBuffer> getPortInputBuffer(size_t port) const noexcept;
 
   /**
    * Increases the offset of the port's buffer by numBytes, then moves the available used bytes to the start of the
    * buffer.
    */
-  void consumeInputBytesAndMoveUsedToStart(size_t port, size_t numBytes);
+  [[nodiscard]] Status consumeInputBytesAndMoveUsedToStart(size_t port, size_t numBytes) noexcept;
 
  private:
-  const std::shared_ptr<IRelocatableResizableBufferFactory> mRelocatableResizableBufferFactory;
-  const std::shared_ptr<IBufferSliceFactory> mSlicedBufferFactory;
+  const size_t mInputPortCount;
+  ConstRef<IBufferSliceFactory> mSlicedBufferFactory;
   std::vector<InputPort> mInputPorts;
-  const std::shared_ptr<IMemSet> mMemSet;
+  ConstRef<IMemSet> mMemSet;
+  IRelocatableResizableBufferFactory* const mRelocatableResizableBufferFactory;
 
  private:
-  [[nodiscard]] static std::vector<InputPort> createInputPorts(size_t inputPortCount);
+  [[nodiscard]] std::vector<InputPort> createInputPorts();
+  [[nodiscard]] Status ensureInputPortsInit() noexcept;
 };
 
 #endif  // GPUSDR_BASESINK_H

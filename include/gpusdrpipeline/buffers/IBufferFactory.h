@@ -17,15 +17,17 @@
 #ifndef GPUSDR_IBUFFERFACTORY_H
 #define GPUSDR_IBUFFERFACTORY_H
 
+#include <gpusdrpipeline/IRef.h>
+#include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/buffers/IBuffer.h>
 #include <gpusdrpipeline/buffers/IRelocatable.h>
 #include <gpusdrpipeline/buffers/IResizable.h>
 
-#include <memory>
-
-class IBufferFactory {
+class IBufferFactory : public virtual IRef {
  public:
-  virtual ~IBufferFactory() = default;
-  virtual std::shared_ptr<IBuffer> createBuffer(size_t size) = 0;
+  virtual Result<IBuffer> createBuffer(size_t size) noexcept = 0;
+
+  ABSTRACT_IREF(IBufferFactory);
 };
+
 #endif  // GPUSDR_IBUFFERFACTORY_H

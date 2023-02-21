@@ -22,14 +22,13 @@
 #include "Factories.h"
 #include "filters/BaseFilter.h"
 
-class Magnitude : public BaseFilter {
+class Magnitude final : public BaseFilter {
  public:
-  Magnitude(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories);
-  ~Magnitude() override = default;
+  static Result<Filter> create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept;
 
-  [[nodiscard]] size_t getOutputDataSize(size_t port) override;
-  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) override;
+  [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
+  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
+  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
 
  private:
   static const size_t mAlignment;
@@ -37,7 +36,17 @@ class Magnitude : public BaseFilter {
   cudaStream_t mCudaStream;
 
  private:
-  [[nodiscard]] size_t getAvailableNumInputElements() const;
+  [[nodiscard]] size_t getAvailableNumInputElements() const noexcept;
+
+ private:
+  Magnitude(
+      int32_t cudaDevice,
+      cudaStream_t cudaStream,
+      IRelocatableResizableBufferFactory* relocatableBufferFactory,
+      IBufferSliceFactory* bufferSliceFactory,
+      IMemSet* memSet) noexcept;
+
+  REF_COUNTED(Magnitude);
 };
 
 #endif  // SDRTEST_SRC_MAGNITUDE_H_

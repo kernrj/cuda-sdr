@@ -1,7 +1,9 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.19)
 
 set(TEST_PROJECT_NAME ${LIB_TARGET_NAME}_tests)
 set(TEST_TARGET_NAME ${TEST_PROJECT_NAME})
+
+message("tests '${CMAKE_CXX_COMPILER}' '${CMAKE_C_COMPILER}'")
 
 include(FetchContent)
 FetchContent_Declare(
@@ -9,33 +11,33 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG release-1.12.1
 )
-
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 project(${TEST_PROJECT_NAME})
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
 add_executable(
     ${TEST_PROJECT_NAME}
     CosineSourceTests.cpp
     FirTests.cpp
+    SteppingDriverTest.cpp
 )
 
-set_target_properties(${TEST_TARGET_NAME} PROPERTIES CUDA_ARCHITECTURES "75")
+#set_target_properties(${TEST_PROJECT_NAME} PROPERTIES CUDA_ARCHITECTURES "${PROJ_CUDA_ARCHITECTURES}")
+
+set(GENERATED_HEADER_DIR "${CMAKE_BINARY_DIR}/include")
+target_include_directories(${TEST_TARGET_NAME} SYSTEM PRIVATE "${GENERATED_HEADER_DIR}")
 
 set(GTEST_INCLUDE_DIR "${CMAKE_BINARY_DIR}/_deps/googletest-src/googletest/include")
 
 target_include_directories(
     ${TEST_TARGET_NAME}
     SYSTEM PRIVATE
-    /usr/local/cuda/include
     "${GTEST_INCLUDE_DIR}"
     "${LIB_PROJECT_ROOT_DIR}/include"
 )
+
+#target_link_directories(${TEST_TARGET_NAME} PRIVATE /usr/local/cuda/lib64)
 
 target_link_libraries(
     ${TEST_TARGET_NAME}

@@ -1,17 +1,32 @@
-//
-// Created by Rick Kern on 1/3/23.
-//
+/*
+ * Copyright 2023 Rick Kern <kernrj@gmail.com>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 
 #include "CudaAllocatorFactory.h"
+
+#include <new>
 
 #include "CudaAllocator.h"
 
 using namespace std;
 
-std::shared_ptr<IAllocator> CudaAllocatorFactory::createCudaAllocator(
+Result<IAllocator> CudaAllocatorFactory::createCudaAllocator(
     int32_t cudaDevice,
     cudaStream_t cudaStream,
     size_t alignment,
-    bool useHostMemory) {
-  return make_shared<CudaAllocator>(cudaDevice, cudaStream, alignment, useHostMemory);
+    bool useHostMemory) noexcept {
+  IAllocator* allocator = new (nothrow) CudaAllocator(cudaDevice, cudaStream, alignment, useHostMemory);
+  return makeRefResultNonNull(allocator);
 }

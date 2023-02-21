@@ -1,101 +1,192 @@
-//
-// Created by Rick Kern on 1/8/23.
-//
+/*
+ * Copyright 2023 Rick Kern <kernrj@gmail.com>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 
 #ifndef GPUSDRPIPELINE_FILTERFACTORIES_H
 #define GPUSDRPIPELINE_FILTERFACTORIES_H
 
 #include <cuda_runtime.h>
+#include <gpusdrpipeline/Modulation.h>
+#include <gpusdrpipeline/SampleType.h>
 #include <gpusdrpipeline/filters/Filter.h>
 #include <gpusdrpipeline/filters/IHackrfSource.h>
+#include <gpusdrpipeline/filters/IPortRemappingSink.h>
+#include <gpusdrpipeline/filters/IReadByteCountMonitor.h>
 
-#include "FirType.h"
+GS_EXPORT Result<Filter> createFilter(const char* name, const char* jsonParameters) noexcept;
+GS_EXPORT Result<Source> createSource(const char* name, const char* jsonParameters) noexcept;
+GS_EXPORT Result<Source> createSink(const char* name, const char* jsonParameters) noexcept;
 
-class ICudaMemcpyFilterFactory {
+GS_EXPORT bool hasFilterFactory(const char* name) noexcept;
+GS_EXPORT bool hasSourceFactory(const char* name) noexcept;
+GS_EXPORT bool hasSinkFactory(const char* name) noexcept;
+
+GS_EXPORT void registerFilterFactory(
+    const char* name,
+    void* context,
+    Filter* (*filterFactory)(const char* jsonParamters)) noexcept;
+
+GS_EXPORT void registerSourceFactory(
+    const char* name,
+    void* context,
+    Source* (*filterFactory)(const char* jsonParamters)) noexcept;
+
+GS_EXPORT void registerSinkFactory(
+    const char* name,
+    void* context,
+    Sink* (*sinkFactory)(const char* jsonParamters)) noexcept;
+
+class ICudaMemcpyFilterFactory : public virtual IRef {
  public:
-  virtual ~ICudaMemcpyFilterFactory() = default;
-  virtual std::shared_ptr<Filter> createCudaMemcpy(
+  virtual Result<Filter> createCudaMemcpy(
       cudaMemcpyKind memcpyKind,
       int32_t cudaDevice,
-      cudaStream_t cudaStream) = 0;
+      cudaStream_t cudaStream) noexcept = 0;
+
+  ABSTRACT_IREF(ICudaMemcpyFilterFactory);
 };
 
-class IAacFileWriterFactory {
+class IAacFileWriterFactory : public virtual IRef {
  public:
-  virtual ~IAacFileWriterFactory() = default;
-  virtual std::shared_ptr<Sink> createAacFileWriter(
+  virtual Result<Sink> createAacFileWriter(
       const char* outputFileName,
       int32_t sampleRate,
-      int32_t bitRate) = 0;
+      int32_t bitRate,
+      int32_t cudaDevice,
+      cudaStream_t cudaStream) noexcept = 0;
+
+  ABSTRACT_IREF(IAacFileWriterFactory);
 };
 
-class IAddConstFactory {
+class IAddConstFactory : public virtual IRef {
  public:
-  virtual ~IAddConstFactory() = default;
-  virtual std::shared_ptr<Filter> createAddConst(
+  virtual Result<Filter> createAddConst(
       float addValueToAmplitude,
       int32_t cudaDevice,
-      cudaStream_t cudaStream) = 0;
+      cudaStream_t cudaStream) noexcept = 0;
+
+  ABSTRACT_IREF(IAddConstFactory);
 };
 
-class IAddConstToVectorLengthFactory {
+class IAddConstToVectorLengthFactory : public virtual IRef {
  public:
-  virtual ~IAddConstToVectorLengthFactory() = default;
-  virtual std::shared_ptr<Filter> createAddConstToVectorLength(
+  virtual Result<Filter> createAddConstToVectorLength(
       float addValueToMagnitude,
       int32_t cudaDevice,
-      cudaStream_t cudaStream) = 0;
+      cudaStream_t cudaStream) noexcept = 0;
+
+  ABSTRACT_IREF(IAddConstToVectorLengthFactory);
 };
 
-class ICosineSourceFactory {
+class ICosineSourceFactory : public virtual IRef {
  public:
-  virtual ~ICosineSourceFactory() = default;
-  virtual std::shared_ptr<Source> createCosineSource(
+  virtual Result<Source> createCosineSource(
+      SampleType sampleType,
       float sampleRate,
       float frequency,
       int32_t cudaDevice,
-      cudaStream_t cudaStream) = 0;
+      cudaStream_t cudaStream) noexcept = 0;
+
+  ABSTRACT_IREF(ICosineSourceFactory);
 };
 
-class IFileReaderFactory {
+class IFileReaderFactory : public virtual IRef {
  public:
-  virtual ~IFileReaderFactory() = default;
-  virtual std::shared_ptr<Source> createFileReader(const char* fileName) = 0;
+  virtual Result<Source> createFileReader(const char* fileName) noexcept = 0;
+
+  ABSTRACT_IREF(IFileReaderFactory);
 };
 
-class IFirFactory {
+class IFirFactory : public virtual IRef {
  public:
-  virtual ~IFirFactory() = default;
-  virtual std::shared_ptr<Filter> createFir(
-      FirType firType,
+  virtual Result<Filter> createFir(
+      SampleType tapType,
+      SampleType elementType,
       size_t decimation,
       const float* taps,
       size_t tapCount,
       int32_t cudaDevice,
-      cudaStream_t cudaStream) = 0;
+      cudaStream_t cudaStream) noexcept = 0;
+
+  ABSTRACT_IREF(IFirFactory);
 };
 
-class IHackrfSourceFactory {
+class IHackrfSourceFactory : public virtual IRef {
  public:
-  virtual ~IHackrfSourceFactory() = default;
-  virtual std::shared_ptr<IHackrfSource> createHackrfSource(
+  virtual Result<IHackrfSource> createHackrfSource(
       int32_t deviceIndex,
       uint64_t frequency,
       double sampleRate,
-      size_t maxBufferCountBeforeDropping) = 0;
+      size_t maxBufferCountBeforeDropping) noexcept = 0;
+
+  ABSTRACT_IREF(IHackrfSourceFactory);
 };
 
-class ICudaFilterFactory {
+class ICudaFilterFactory : public virtual IRef {
  public:
-  virtual ~ICudaFilterFactory() = default;
-  virtual std::shared_ptr<Filter> createFilter(int32_t cudaDevice, cudaStream_t cudaStream) = 0;
+  virtual Result<Filter> createFilter(int32_t cudaDevice, cudaStream_t cudaStream) noexcept = 0;
+
+  ABSTRACT_IREF(ICudaFilterFactory);
 };
 
-class IQuadDemodFactory {
+class IQuadDemodFactory : public virtual IRef {
  public:
-  virtual ~IQuadDemodFactory() = default;
+  /**
+   * @param fskDeviation Only used for FM
+   */
+  virtual Result<Filter> create(
+      Modulation modulation,
+      float rfSampleRate,
+      float fskDeviation,
+      int32_t cudaDevice,
+      cudaStream_t cudaStream) noexcept = 0;
 
-  virtual std::shared_ptr<Filter> create(float gain, int32_t cudaDevice, cudaStream_t cudaStream) = 0;
+  ABSTRACT_IREF(IQuadDemodFactory);
+};
+
+class IPortRemappingSinkFactory : public virtual IRef {
+ public:
+  virtual Result<IPortRemappingSink> create(Sink* mapToSink) noexcept = 0;
+
+  ABSTRACT_IREF(IPortRemappingSinkFactory);
+};
+
+class IRfToPcmAudioFactory : public virtual IRef {
+ public:
+  virtual Result<Filter> create(
+      float rfSampleRate,
+      Modulation modulation,
+      size_t rfLowPassDecim,
+      size_t audioLowPassDecim,
+      float centerFrequency,
+      float channelFrequency,
+      float channelWidth,
+      float fskDevationIfFm,
+      float rfLowPassDbAttenuation,
+      float audioLowPassDbAttenuation,
+      int32_t cudaDevice,
+      cudaStream_t cudaStream) noexcept = 0;
+
+  ABSTRACT_IREF(IRfToPcmAudioFactory);
+};
+
+class IReadByteCountMonitorFactory : public virtual IRef {
+ public:
+  virtual Result<IReadByteCountMonitor> create(Filter* monitoredFilter) noexcept = 0;
+
+  ABSTRACT_IREF(IReadByteCountMonitorFactory);
 };
 
 #endif  // GPUSDRPIPELINE_FILTERFACTORIES_H

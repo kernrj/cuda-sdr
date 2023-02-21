@@ -17,41 +17,77 @@
 #include "CudaMemcpyFilter.h"
 
 #include <cstring>
-#include <stdexcept>
 #include <string>
 
 #include "util/CudaDevicePushPop.h"
 
 using namespace std;
 
-CudaMemcpyFilter::CudaMemcpyFilter(
+static bool isInputHostMemory(cudaMemcpyKind memcpyKind) noexcept {
+  return memcpyKind == cudaMemcpyHostToDevice || memcpyKind == cudaMemcpyHostToHost;
+}
+
+Result<Filter> CudaMemcpyFilter::create(
     cudaMemcpyKind memcpyKind,
     int32_t cudaDevice,
     cudaStream_t cudaStream,
-    IFactories* factories)
-    : BaseFilter(
-        factories->getRelocatableCudaBufferFactory(cudaDevice, cudaStream, 32, /*useHostMemory=*/true),
-        factories->getBufferSliceFactory(),
-        1,
-        factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream)),
-      mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream),
-      mMemCopier(factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, memcpyKind)) {}
+    IFactories* factories) noexcept {
+  Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
+  ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
+  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
+  Ref<IBufferCopier> cudaCopier;
 
-size_t CudaMemcpyFilter::getOutputDataSize(size_t port) { return getPortInputBuffer(0)->range()->used(); }
-size_t CudaMemcpyFilter::getOutputSizeAlignment(size_t port) { return 1; }
+  UNWRAP_OR_FWD_RESULT(
+      relocatableCudaBufferFactory,
+      factories->createRelocatableCudaBufferFactory(
+          cudaDevice,
+          cudaStream,
+          32,
+          /*useHostMemory=*/isInputHostMemory(memcpyKind)));
+  UNWRAP_OR_FWD_RESULT(
+      cudaCopier,
+      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, memcpyKind));
 
-void CudaMemcpyFilter::readOutput(const vector<shared_ptr<IBuffer>>& portOutputs) {
-  if (portOutputs.empty()) {
-    throw runtime_error("One output port is required");
-  }
+  return makeRefResultNonNull<Filter>(new (nothrow) CudaMemcpyFilter(
+      relocatableCudaBufferFactory.get(),
+      bufferSliceFactory.get(),
+      memSet,
+      cudaCopier.get()));
+}
 
-  const shared_ptr<IBuffer> inputBuffer = getPortInputBuffer(0);
-  const auto& outBuffer = portOutputs[0];
+CudaMemcpyFilter::CudaMemcpyFilter(
+    IRelocatableResizableBufferFactory* relocatableBufferFactory,
+    IBufferSliceFactory* bufferSliceFactory,
+    IMemSet* memSet,
+    IBufferCopier* cudaCopier) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
+      mMemCopier(cudaCopier) {}
+
+size_t CudaMemcpyFilter::getOutputDataSize(size_t port) noexcept {
+  GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
+
+  Ref<IBuffer> inputBuffer;
+  UNWRAP_OR_RETURN(inputBuffer, getPortInputBuffer(0), 0);
+
+  return inputBuffer->range()->used();
+}
+
+size_t CudaMemcpyFilter::getOutputSizeAlignment(size_t port) noexcept {
+  GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
+  return 1;
+}
+
+Status CudaMemcpyFilter::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
+  GS_REQUIRE_OR_RET_STATUS(portCount != 0, "One output port is required");
+
+  Ref<IBuffer> inputBuffer;
+  UNWRAP_OR_FWD_STATUS(inputBuffer, getPortInputBuffer(0));
+  const auto& outBuffer = portOutputBuffers[0];
   size_t copyNumBytes = min(outBuffer->range()->remaining(), inputBuffer->range()->used());
 
-  mMemCopier->copy(outBuffer->writePtr(), inputBuffer->readPtr(), copyNumBytes);
-  outBuffer->range()->increaseEndOffset(copyNumBytes);
+  FWD_IF_ERR(mMemCopier->copy(outBuffer->writePtr(), inputBuffer->readPtr(), copyNumBytes));
+  FWD_IF_ERR(outBuffer->range()->increaseEndOffset(copyNumBytes));
 
-  consumeInputBytesAndMoveUsedToStart(0, copyNumBytes);
+  return consumeInputBytesAndMoveUsedToStart(0, copyNumBytes);
 }

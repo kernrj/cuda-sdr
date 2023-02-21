@@ -22,19 +22,20 @@
 #include "buffers/IBufferRangeFactory.h"
 #include "buffers/IResizableBufferFactory.h"
 
-class ResizableBufferFactory : public IResizableBufferFactory {
+class ResizableBufferFactory final : public IResizableBufferFactory {
  public:
   ResizableBufferFactory(
-      const std::shared_ptr<IAllocator>& allocator,
-      const std::shared_ptr<IBufferCopier>& bufferCopier,
-      const std::shared_ptr<IBufferRangeFactory>& bufferRangeFactory);
-  ~ResizableBufferFactory() override = default;
-  std::shared_ptr<IResizableBuffer> createResizableBuffer(size_t size) override;
+      IAllocator* allocator,
+      const IBufferCopier* bufferCopier,
+      const IBufferRangeFactory* bufferRangeFactory) noexcept;
+  Result<IResizableBuffer> createResizableBuffer(size_t size) noexcept final;
 
  private:
-  const std::shared_ptr<IAllocator> mAllocator;
-  const std::shared_ptr<IBufferCopier> mBufferCopier;
-  const std::shared_ptr<IBufferRangeFactory> mBufferRangeFactory;
+  ConstRef<IAllocator> mAllocator;
+  ConstRef<const IBufferCopier> mBufferCopier;
+  ConstRef<const IBufferRangeFactory> mBufferRangeFactory;
+
+  REF_COUNTED(ResizableBufferFactory);
 };
 
 #endif  // GPUSDR_RESIZABLEBUFFERFACTORY_H

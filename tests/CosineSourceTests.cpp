@@ -1,50 +1,51 @@
 #include <cuComplex.h>
 #include <cuda.h>
 #include <gpusdrpipeline/Factories.h>
-#include <gpusdrpipeline/util/create.h>
 #include <gtest/gtest.h>
-
-#include <string>
 
 using namespace std;
 
 TEST(WhenCosineSourceOutputs, ItMatchesCpuCalculations) {
   const int32_t cudaDevice = 0;
   cudaStream_t cudaStream = nullptr;
-  IFactories* factories = getFactoriesSingleton();
+  ConstRef<IFactories> factories = unwrap(getFactoriesSingleton());
 
   const size_t sampleRate = 100;
   const float frequency = 1.0f;
 
   const auto cosineSource =
-      factories->getCosineSourceFactory()->createCosineSource(sampleRate, frequency, cudaDevice, cudaStream);
-  auto hostToDeviceMemCopier =
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyHostToDevice);
-  auto deviceToHostMemCopier =
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToHost);
-  auto cudaMemSet = factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream);
+      unwrap(factories->getCosineSourceFactory()
+                 ->createCosineSource(SampleType_FloatComplex, sampleRate, frequency, cudaDevice, cudaStream));
+  auto hostToDeviceMemCopier = unwrap(
+      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyHostToDevice));
+  auto deviceToHostMemCopier = unwrap(
+      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToHost));
+  auto cudaMemSet = unwrap(factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
   const auto cudaHostAllocator =
-      factories->getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, 32, true);
+      unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, 32, true));
   const auto cudaGpuAllocator =
-      factories->getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, 32, false);
-  const auto cudaGpuBufferFactory = factories->getBufferFactory(cudaGpuAllocator);
-  const auto cudaHostBufferFactory = factories->getBufferFactory(cudaHostAllocator);
-  vector<shared_ptr<IBuffer>> outputBuffers;
+      unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, 32, false));
+  const auto cudaGpuBufferFactory = unwrap(factories->createBufferFactory(cudaGpuAllocator));
+  const auto cudaHostBufferFactory = unwrap(factories->createBufferFactory(cudaHostAllocator));
+  vector<IBuffer*> outputBuffers;
   const size_t outputValueCount = sampleRate + 1;
   const size_t outputBufferSize = outputValueCount * sizeof(cuComplex);
-  outputBuffers.push_back(cudaGpuBufferFactory->createBuffer(outputBufferSize));
+  ConstRef<IBuffer> outputBuffer = unwrap(cudaGpuBufferFactory->createBuffer(outputBufferSize));
+  outputBuffers.push_back(outputBuffer.get());
   cudaMemSet->memSet(outputBuffers[0]->writePtr(), 0, outputBuffers[0]->range()->capacity());
-  cosineSource->readOutput(outputBuffers);
+  throwIfError(cosineSource->readOutput(outputBuffers.data(), 1));
 
-  auto hostMem = cudaHostBufferFactory->createBuffer(outputBuffers[0]->range()->used());
+  auto hostMem = unwrap(cudaHostBufferFactory->createBuffer(outputBuffers[0]->range()->used()));
   hostMem->range()->clearRange();
-  printf(
-      "Copying [%zu] bytes from [%p] to [%p]\n",
+  gslog(
+      GSLOG_DEBUG,
+      "Copying [%zu] bytes from [%p] to [%p]",
       outputBuffers[0]->range()->used(),
       outputBuffers[0]->readPtr(),
       hostMem->writePtr());
-  deviceToHostMemCopier->copy(hostMem->writePtr(), outputBuffers[0]->readPtr(), outputBuffers[0]->range()->used());
-  hostMem->range()->setUsedRange(0, outputBuffers[0]->range()->used());
+  throwIfError(
+      deviceToHostMemCopier->copy(hostMem->writePtr(), outputBuffers[0]->readPtr(), outputBuffers[0]->range()->used()));
+  throwIfError(hostMem->range()->setUsedRange(0, outputBuffers[0]->range()->used()));
 
   auto values = hostMem->readPtr<cuComplex>();
 

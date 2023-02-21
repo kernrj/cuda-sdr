@@ -19,19 +19,16 @@
 
 #include <cuda_runtime.h>
 
-#include <memory>
-
 #include "buffers/IBuffer.h"
 #include "filters/Filter.h"
 
-class CosineSource : public Source {
+class CosineSource final : public virtual Source {
  public:
-  CosineSource(float sampleRate, float frequency, int32_t cudaDevice, cudaStream_t cudaStream);
-  ~CosineSource() override = default;
+  CosineSource(float sampleRate, float frequency, int32_t cudaDevice, cudaStream_t cudaStream) noexcept;
 
-  [[nodiscard]] size_t getOutputDataSize(size_t port) override;
-  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) override;
+  [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
+  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
+  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
 
  private:
   float mSampleRate;
@@ -41,6 +38,8 @@ class CosineSource : public Source {
   cudaStream_t mCudaStream;
   float mPhi;
   size_t mAlignment;
+
+  REF_COUNTED(CosineSource);
 };
 
 #endif  // SDRTEST_SRC_COSINESOURCE_H_

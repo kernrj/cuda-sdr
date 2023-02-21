@@ -1,10 +1,14 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.19)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(PROJECT_MACRO_PREFIX GS)
+
 include(FetchContent)
+
+message("src '${CMAKE_CXX_COMPILER}' '${CMAKE_C_COMPILER}'")
 
 FetchContent_Declare(
     gsdr
@@ -16,12 +20,15 @@ FetchContent_MakeAvailable(gsdr)
 
 FetchContent_Declare(
     remez
-    GIT_REPOSITORY https://github.com/kernrj/remez-exchange.git
-    GIT_TAG main
+    #GIT_REPOSITORY https://github.com/kernrj/remez-exchange.git
+    #GIT_TAG main
+    SOURCE_DIR /home/rick/projects/remez
 )
 FetchContent_MakeAvailable(remez)
 
 set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/usr/local/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig")
+
+find_package(CUDAToolkit REQUIRED)
 
 set(GR_REQUIRED_COMPONENTS ANALOG BLOCKS DIGITAL FFT FILTER RUNTIME)
 find_package(Gnuradio "3.10.1" REQUIRED COMPONENTS analog blocks digital fft filter runtime)
@@ -55,7 +62,11 @@ add_library(${LIB_TARGET_NAME}
     buffers/CudaAllocatorFactory.cpp
     buffers/CudaBufferCopier.cpp
     buffers/CudaBufferCopierFactory.cpp
+    buffers/CudaMemory.cpp
+    buffers/CudaMemory.h
     buffers/CudaMemSet.cpp
+    buffers/Memory.cpp
+    buffers/Memory.h
     buffers/OwnedBuffer.cpp
     buffers/RelocatableResizableBufferFactory.cpp
     buffers/RelocatableCudaBufferFactory.cpp
@@ -65,7 +76,16 @@ add_library(${LIB_TARGET_NAME}
     buffers/SysMemAllocator.cpp
     buffers/SysMemBufferCopier.cpp
     buffers/BufferFactory.cpp
-    HackrfSession.cpp
+    driver/DriverToDot.cpp
+    driver/DriverToDot.h
+    driver/DriverToDotFactory.h
+    driver/DriverTool.h
+    driver/FilterDriver.cpp
+    driver/FilterDriver.h
+    driver/FilterDriverFactory.h
+    driver/SteppingDriver.cpp
+    driver/SteppingDriver.h
+    driver/SteppingDriverFactory.h
     Factories.cpp
     filters/AacFileWriter.cpp
     filters/AacFileWriter.h
@@ -75,6 +95,8 @@ add_library(${LIB_TARGET_NAME}
     filters/AddConstToVectorLength.h
     filters/BaseFilter.cpp
     filters/BaseSink.cpp
+    filters/ComplexCosineSource.cpp
+    filters/ComplexCosineSource.h
     filters/CosineSource.cpp
     filters/CosineSource.h
     filters/CudaMemcpyFilter.cpp
@@ -89,9 +111,11 @@ add_library(${LIB_TARGET_NAME}
     filters/factories/Int8ToFloatFactory.h
     filters/factories/MagnitudeFactory.h
     filters/factories/MultiplyFactory.h
+    filters/factories/RfToPcmAudioFactory.h
     filters/factories/QuadDemodFactory.h
     filters/FileReader.cpp
     filters/FileReader.h
+    filters/FilterFactories.cpp
     filters/Fir.cpp
     filters/Fir.h
     filters/HackrfSource.cpp
@@ -102,8 +126,22 @@ add_library(${LIB_TARGET_NAME}
     filters/Magnitude.h
     filters/Multiply.cpp
     filters/Multiply.h
-    filters/QuadDemod.cpp
-    filters/QuadDemod.h
+    filters/PortRemappingSink.cpp
+    filters/PortRemappingSink.h
+    filters/QuadAmDemod.cpp
+    filters/QuadAmDemod.h
+    filters/QuadFmDemod.cpp
+    filters/QuadFmDemod.h
+    filters/ReadByteCountMonitor.cpp
+    filters/ReadByteCountMonitor.h
+    filters/factories/ReadByteCountMonitorFactory.h
+    filters/RfToPcmAudio.cpp
+    filters/RfToPcmAudio.h
+    filters/Waiter.cpp
+    FileLogger.cpp
+    FileLogger.h
+    GSLog.cpp
+    HackrfSession.cpp
     prototype/CudaLowPassBlock.cpp
     prototype/CudaLowPassBlock.h
     prototype/fm_deemph.cpp
@@ -118,8 +156,7 @@ add_library(${LIB_TARGET_NAME}
     prototype/wbfm_rx.h
     util/CudaUtil.cpp
     util/Thread.cpp
-    util/Window.cpp
-    )
+    util/Window.cpp)
 
 target_include_directories(${LIB_TARGET_NAME}
     SYSTEM PRIVATE
@@ -147,14 +184,7 @@ target_include_directories(
 )
 target_include_directories(${LIB_TARGET_NAME} INTERFACE "$<INSTALL_INTERFACE:include>")
 
-#message("[${HACKRF_LIBRARY_DIRS}] [${HACKRF_LIBRARY_DIR}]")
-#target_link_directories( sdrtest
-#  PRIVATE
-#  ${HACKRF_LIBRARY_DIRS}
-#)
-
-set_target_properties(${LIB_TARGET_NAME} PROPERTIES
-    CUDA_SEPARABLE_COMPILATION ON)
+set_target_properties(${LIB_TARGET_NAME} PROPERTIES CUDA_ARCHITECTURES "${PROJ_CUDA_ARCHITECTURES}")
 
 target_link_directories(
     ${PROJECT_NAME} SYSTEM PRIVATE
@@ -163,10 +193,15 @@ target_link_directories(
     ${GNURADIO_RUNTIME_LIBRARY_DIRS}
 )
 
-set_target_properties(${LIB_TARGET_NAME} PROPERTIES CUDA_ARCHITECTURES "75")
+get_target_property(LIB_TARGET_TYPE ${LIB_TARGET_NAME} TYPE)
+if (LIB_TARGET_TYPE STREQUAL STATIC_LIBRARY)
+    set(DEPENDENCY_VISIBILITY PUBLIC)
+else()
+    set(DEPENDENCY_VISIBILITY PRIVATE)
+endif()
 
 target_link_libraries(${LIB_TARGET_NAME}
-    PRIVATE
+    ${DEPENDENCY_VISIBILITY}
     hackrf
     nvcuvid
     nvidia-encode
@@ -190,13 +225,32 @@ target_link_libraries(${LIB_TARGET_NAME}
     z
     gsdr
     remez
+    CUDA::cudart
+)
+
+if (MSVC)
+    target_compile_options(${LIB_TARGET_NAME} PRIVATE /W4)
+else ()
+    target_compile_options(
+        ${LIB_TARGET_NAME}
+        PRIVATE
+        -Wall
+        -Wextra
+        -Werror=unused-result
+        -Werror=return-type
+        -Werror=final-dtor-non-final-class
+        -Wno-return-type-c-linkage
     )
+endif ()
 
 target_compile_definitions(${LIB_TARGET_NAME} PRIVATE $<$<CONFIG:Debug>:DEBUG>>)
 
 include(GenerateExportHeader)
 
-set(EXPORT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/include/${LIB_TARGET_NAME}/${LIB_TARGET_NAME}_export.h")
+set(GENERATED_HEADER_DIR "${PROJECT_BINARY_DIR}/include")
+set(EXPORT_FILE "${GENERATED_HEADER_DIR}/${LIB_PROJECT_NAME}/${LIB_PROJECT_NAME}_export.h")
+set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+set(CMAKE_VISIBILITY_INLINES_HIDDEN 1)
 
 generate_export_header(
     ${LIB_TARGET_NAME}
@@ -206,6 +260,8 @@ generate_export_header(
     STATIC_DEFINE ${PROJECT_MACRO_PREFIX}_STATIC_BUILD
     EXPORT_FILE_NAME ${EXPORT_FILE}
 )
+
+target_include_directories(${LIB_TARGET_NAME} SYSTEM PRIVATE "${GENERATED_HEADER_DIR}")
 
 if (WIN32)
     install(
@@ -227,6 +283,7 @@ else ()
 endif ()
 
 install(DIRECTORY ${LIB_DEV_PUBLIC_HEADER_DIR}/${LIB_TARGET_NAME} DESTINATION include/)
+install(DIRECTORY "${GENERATED_HEADER_DIR}/${LIB_PROJECT_NAME}" DESTINATION include/)
 install(EXPORT ${LIB_TARGET_NAME} DESTINATION lib/cmake/${LIB_TARGET_NAME} FILE ${LIB_TARGET_NAME}-config.cmake)
 
 add_subdirectory(applications)

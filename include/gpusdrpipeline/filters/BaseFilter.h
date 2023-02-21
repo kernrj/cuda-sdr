@@ -32,11 +32,15 @@
  */
 class BaseFilter : public virtual Filter, public BaseSink {
  public:
+  BaseFilter() = delete;
+
+ protected:
   BaseFilter(
-      const std::shared_ptr<IRelocatableResizableBufferFactory>& relocatableResizableBufferFactory,
-      const std::shared_ptr<IBufferSliceFactory>& slicedBufferFactory,
+      IRelocatableResizableBufferFactory* relocatableResizableBufferFactory,
+      IBufferSliceFactory* slicedBufferFactory,
       size_t inputPortCount,
-      const std::shared_ptr<IMemSet>& memSet = nullptr);
+      IMemSet* memSet = nullptr) noexcept;
+
   ~BaseFilter() override = default;
 };
 

@@ -16,7 +16,6 @@
 
 #include "Int8ToFloat.h"
 
-#include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 #include <gsdr/conversion.h>
 
@@ -29,42 +28,61 @@ using namespace std;
 
 const size_t Int8ToFloat::mAlignment = 32;
 
-Int8ToFloat::Int8ToFloat(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories)
-    : BaseFilter(
-        factories->getRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false),
-        factories->getBufferSliceFactory(),
-        1,
-        factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream)),
+Result<Filter> Int8ToFloat::create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept {
+  Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
+  ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
+  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
+
+  UNWRAP_OR_FWD_RESULT(
+      relocatableCudaBufferFactory,
+      factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
+
+  return makeRefResultNonNull<Filter>(new (
+      nothrow) Int8ToFloat(cudaDevice, cudaStream, relocatableCudaBufferFactory.get(), bufferSliceFactory, memSet));
+}
+Int8ToFloat::Int8ToFloat(
+    int32_t cudaDevice,
+    cudaStream_t cudaStream,
+    IRelocatableResizableBufferFactory* relocatableBufferFactory,
+    IBufferSliceFactory* bufferSliceFactory,
+    IMemSet* memSet) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
       mCudaDevice(cudaDevice),
       mCudaStream(cudaStream) {}
 
-size_t Int8ToFloat::getOutputDataSize(size_t port) {
-  if (port != 0) {
-    throw invalid_argument("Port [" + to_string(port) + "] is out of range");
-  }
+size_t Int8ToFloat::getOutputDataSize(size_t port) noexcept {
+  GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Port [%zu] is out of range", port);
 
-  return getPortInputBuffer(0)->range()->used();
+  Ref<const IBuffer> inputBuffer;
+  UNWRAP_OR_RETURN(inputBuffer, getPortInputBuffer(0), 0);
+
+  return inputBuffer->range()->used() * sizeof(float) / sizeof(int8_t);
 }
 
-size_t Int8ToFloat::getOutputSizeAlignment(size_t port) { return mAlignment; }
+size_t Int8ToFloat::getOutputSizeAlignment(size_t port) noexcept {
+  GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
+  return mAlignment;
+}
 
-void Int8ToFloat::readOutput(const vector<shared_ptr<IBuffer>>& portOutputs) {
-  if (portOutputs.empty()) {
-    throw invalid_argument("One output port is required");
-  }
+Status Int8ToFloat::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
+  GS_REQUIRE_OR_RET_STATUS(0 == portCount, "One output port is required");
 
-  const auto inputBuffer = getPortInputBuffer(0);
-  const auto& outputBuffer = portOutputs[0];
+  Ref<const IBuffer> inputBuffer;
+  UNWRAP_OR_FWD_STATUS(inputBuffer, getPortInputBuffer(0));
+  const auto& outputBuffer = portOutputBuffers[0];
 
   const size_t elementCount = min(inputBuffer->range()->used(), outputBuffer->range()->remaining() / sizeof(float));
 
-  SAFE_CUDA(gsdrInt8ToNormFloat(
-      getPortInputBuffer(0)->readPtr<int8_t>(),
+  SAFE_CUDA_OR_RET_STATUS(gsdrInt8ToNormFloat(
+      inputBuffer->readPtr<int8_t>(),
       outputBuffer->writePtr<float>(),
       elementCount,
       mCudaDevice,
       mCudaStream));
 
-  outputBuffer->range()->increaseEndOffset(elementCount * sizeof(float));
-  consumeInputBytesAndMoveUsedToStart(0, elementCount * sizeof(int8_t));
+  FWD_IF_ERR(outputBuffer->range()->increaseEndOffset(elementCount * sizeof(float)));
+  FWD_IF_ERR(consumeInputBytesAndMoveUsedToStart(0, elementCount * sizeof(int8_t)));
+
+  return Status_Success;
 }

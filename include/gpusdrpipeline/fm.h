@@ -20,7 +20,10 @@
 constexpr double kTauEu = 50e-6;
 constexpr double kTauUs = 75e-6;
 
-constexpr double kNbfmChannelWidth = 16e3;
-constexpr double kWbfmChannelWidth = 75e3;
+constexpr double kNbfmChannelWidth = 15e3;
+constexpr double kWbfmChannelWidth = 200e3;
+
+constexpr double kNbfmFrequencyDeviation = 5e3;
+constexpr double kWbfmFrequencyDeviation = 75e3;
 
 #endif  // SDRTEST_SRC_FM_H_

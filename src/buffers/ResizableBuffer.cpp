@@ -18,37 +18,48 @@
 
 using namespace std;
 
-ResizableBuffer::ResizableBuffer(
+Result<IResizableBuffer> ResizableBuffer::create(
     size_t initialCapacity,
     size_t startOffset,
     size_t endOffset,
-    const std::shared_ptr<IAllocator>& allocator,
-    const std::shared_ptr<IBufferCopier>& bufferCopier,
-    const std::shared_ptr<IBufferRangeFactory>& bufferRangeFactory)
-    : mAllocator(allocator),
-      mBufferCopier(bufferCopier),
-      mRange(bufferRangeFactory->createBufferRange()) {
-  size_t actualCapacity = 0;
-  mData = mAllocator->allocate(initialCapacity, &actualCapacity);
-  mRange->setCapacity(actualCapacity);
-  mRange->setUsedRange(startOffset, endOffset);
+    IAllocator* allocator,
+    const IBufferCopier* bufferCopier,
+    const IBufferRangeFactory* bufferRangeFactory) noexcept {
+  Ref<IMemory> initialBuffer;
+  Ref<IBufferRangeMutableCapacity> bufferRange;
+  UNWRAP_OR_FWD_RESULT(initialBuffer, allocator->allocate(initialCapacity));
+  UNWRAP_OR_FWD_RESULT(bufferRange, bufferRangeFactory->createBufferRange());
+  bufferRange->setCapacity(initialCapacity);
+  FWD_IN_RESULT_IF_ERR(bufferRange->setUsedRange(startOffset, endOffset));
+
+  DO_OR_RET_ERR_RESULT(return makeRefResultNonNull<IResizableBuffer>(
+      new (nothrow) ResizableBuffer(allocator, bufferCopier, bufferRange.get())));
 }
 
-uint8_t* ResizableBuffer::base() { return mData.get(); }
-const uint8_t* ResizableBuffer::base() const { return mData.get(); }
-IBufferRange* ResizableBuffer::range() { return mRange.get(); }
-const IBufferRange* ResizableBuffer::range() const { return mRange.get(); }
+ResizableBuffer::ResizableBuffer(
+    IAllocator* allocator,
+    const IBufferCopier* bufferCopier,
+    IBufferRangeMutableCapacity* bufferRange) noexcept
+    : mAllocator(allocator),
+      mBufferCopier(bufferCopier),
+      mRange(bufferRange) {}
 
-void ResizableBuffer::resize(size_t newSize, size_t* actualSizeOut) {
+uint8_t* ResizableBuffer::base() noexcept { return mData->data(); }
+const uint8_t* ResizableBuffer::base() const noexcept { return mData->data(); }
+IBufferRange* ResizableBuffer::range() noexcept { return mRange.get(); }
+const IBufferRange* ResizableBuffer::range() const noexcept { return mRange.get(); }
+
+Status ResizableBuffer::resize(size_t newSize) noexcept {
   const size_t originalCapacity = range()->capacity();
   if (newSize > originalCapacity) {
-    size_t actualCapacity = 0;
     size_t copyNumBytes = originalCapacity;
-    size_t newCapacity = 0;
-    shared_ptr<uint8_t> newData = mAllocator->allocate(newSize, &newCapacity);
-    mBufferCopier->copy(newData.get(), base(), copyNumBytes);
+    Ref<IMemory> newData;
+    UNWRAP_OR_FWD_STATUS(newData, mAllocator->allocate(newSize));
+    FWD_IF_ERR(mBufferCopier->copy(newData.get(), base(), copyNumBytes));
 
-    mRange->setCapacity(newCapacity);
+    mRange->setCapacity(newData->capacity());
     mData = newData;
   }
+
+  return Status_Success;
 }

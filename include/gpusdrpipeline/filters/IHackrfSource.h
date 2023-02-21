@@ -24,15 +24,20 @@
 #include <string>
 #include <vector>
 
-class IHackrfSource : public Source {
+class IHackrfSource : public virtual Source {
  public:
-  virtual std::vector<std::string> getDeviceSerialNumbers() = 0;
+  [[nodiscard]] virtual int32_t getDeviceCount() const noexcept = 0;
+  [[nodiscard]] virtual size_t getDeviceSerialNumber(int32_t deviceIndex, char* buffer, size_t bufferSize)
+      const noexcept = 0;
 
-  virtual void selectDeviceByIndex(int32_t deviceIndex) = 0;
-  virtual void selectDeviceBySerialNumber(const std::string& serialNumber) = 0;
+  [[nodiscard]] virtual Status selectDeviceByIndex(int32_t deviceIndex) noexcept = 0;
+  [[nodiscard]] virtual Status selectDeviceBySerialNumber(const char* serialNumber) noexcept = 0;
+  [[nodiscard]] virtual Status releaseDevice() noexcept = 0;
 
-  virtual void start() = 0;
-  virtual void stop() = 0;
+  [[nodiscard]] virtual Status start() noexcept = 0;
+  [[nodiscard]] virtual Status stop() noexcept = 0;
+
+  ABSTRACT_IREF(IHackrfSource);
 };
 
 #endif  // SDRTEST_SRC_IHACKRFSOURCE_H_

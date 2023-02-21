@@ -20,68 +20,81 @@
 
 using namespace std;
 
-RelocatableResizableBuffer::RelocatableResizableBuffer(
-    size_t initialCapacity,
-    size_t startOffset,
-    size_t endOffset,
-    const std::shared_ptr<IAllocator>& allocator,
-    const std::shared_ptr<IBufferCopier>& bufferCopier,
-    const std::shared_ptr<IBufferRangeFactory>& bufferRangeFactory)
-    : mAllocator(allocator),
-      mBufferCopier(bufferCopier),
-      mRange(bufferRangeFactory->createBufferRange()) {
-  if (startOffset > initialCapacity) {
-    THROW(
-        "Start offset [" << startOffset << "] cannot be greater than the initial capacity [" << initialCapacity << "]");
-  } else if (endOffset > initialCapacity) {
-    THROW("End offset [" << startOffset << "] cannot be greater than the initial capacity [" << initialCapacity << "]");
-  }
+Result<IRelocatableResizableBuffer> RelocatableResizableBuffer::create(
+    size_t size,
+    IAllocator* allocator,
+    const IBufferCopier* bufferCopier,
+    const IBufferRangeFactory* bufferRangeFactory) noexcept {
+  NON_NULL_PARAM_OR_RET(allocator);
+  NON_NULL_PARAM_OR_RET(bufferCopier);
+  NON_NULL_PARAM_OR_RET(bufferRangeFactory);
 
-  size_t actualCapacity = 0;
-  mData = mAllocator->allocate(initialCapacity, &actualCapacity);
-  mDataCopy = mAllocator->allocate(actualCapacity, nullptr);
-  mRange->setCapacity(actualCapacity);
-  mRange->setUsedRange(startOffset, endOffset);
+  Ref<IBufferRangeMutableCapacity> bufferRange;
+  UNWRAP_OR_FWD_RESULT(bufferRange, bufferRangeFactory->createBufferRange());
+
+  auto buffer = new (nothrow) RelocatableResizableBuffer(allocator, bufferCopier, bufferRange);
+  NON_NULL_OR_RET(buffer);
+  FWD_IN_RESULT_IF_ERR(buffer->resize(size));
+
+  return makeRefResultNonNull<IRelocatableResizableBuffer>(buffer);
 }
 
-uint8_t* RelocatableResizableBuffer::base() { return mData.get(); }
-const uint8_t* RelocatableResizableBuffer::base() const { return mData.get(); }
-IBufferRange* RelocatableResizableBuffer::range() { return mRange.get(); }
-const IBufferRange* RelocatableResizableBuffer::range() const { return mRange.get(); }
+RelocatableResizableBuffer::RelocatableResizableBuffer(
+    const ImmutableRef<IAllocator>& allocator,
+    const ImmutableRef<const IBufferCopier>& bufferCopier,
+    const ImmutableRef<IBufferRangeMutableCapacity>& bufferRange) noexcept
+    : mAllocator(allocator),
+      mBufferCopier(bufferCopier),
+      mRange(bufferRange) {}
 
-void RelocatableResizableBuffer::resize(size_t newSize, size_t* actualSizeOut) {
+uint8_t* RelocatableResizableBuffer::base() noexcept { return mData->data(); }
+const uint8_t* RelocatableResizableBuffer::base() const noexcept { return mData->data(); }
+IBufferRange* RelocatableResizableBuffer::range() noexcept { return mRange.get(); }
+const IBufferRange* RelocatableResizableBuffer::range() const noexcept { return mRange.get(); }
+
+Status RelocatableResizableBuffer::resize(size_t newSize) noexcept {
   const size_t originalCapacity = mRange->capacity();
   if (newSize > originalCapacity) {
     mDataCopy.reset();
 
-    size_t actualCapacity = 0;
     size_t copyNumBytes = originalCapacity;
-    size_t newCapacity = 0;
-    shared_ptr<uint8_t> newData = mAllocator->allocate(newSize, &newCapacity);
-    mBufferCopier->copy(newData.get(), base(), copyNumBytes);
 
-    mDataCopy = mAllocator->allocate(newCapacity, nullptr);
-    mRange->setCapacity(newCapacity);
+    Result<IMemory> newDataResult = mAllocator->allocate(newSize);
+    FWD_IF_ERR(newDataResult.status);
+    ConstRef<IMemory> newData = newDataResult.value;
+
+    FWD_IF_ERR(mBufferCopier->copy(newData.get(), base(), copyNumBytes));
+    UNWRAP_OR_FWD_STATUS(mDataCopy, mAllocator->allocate(newData->capacity()));
+
+    mRange->setCapacity(newData->capacity());
     mData = newData;
   }
+
+  return Status_Success;
 }
 
-void RelocatableResizableBuffer::relocate(size_t dstOffset, size_t srcOffset, size_t length) {
+Status RelocatableResizableBuffer::relocate(size_t dstOffset, size_t srcOffset, size_t length) noexcept {
   const size_t capacity = mRange->capacity();
-  if (dstOffset + length > capacity) {
-    THROW(
-        "Cannot copy to range. Destination [" << dstOffset << "] length [" << length << "] - exceeds capacity ["
-                                              << capacity << "]");
-  } else if (srcOffset + length > capacity) {
-    THROW(
-        "Cannot copy from range. Source [" << srcOffset << "] length [" << length << "] - exceeds capacity ["
-                                           << capacity << "]");
-  }
+  GS_REQUIRE_OR_RET_STATUS_FMT(
+      dstOffset + length <= capacity,
+      "Cannot relocate. Target offset [%zu] + length [%zu] exceeds capacity [%zu]",
+      dstOffset,
+      length,
+      capacity);
+
+  GS_REQUIRE_OR_RET_STATUS_FMT(
+      srcOffset + length <= capacity,
+      "Cannot relocate. Source offset [%zu] + length [%zu] exceeds capacity [%zu]",
+      srcOffset,
+      length,
+      capacity);
 
   if (length > 0) {
-    mBufferCopier->copy(mDataCopy.get() + dstOffset, mData.get() + srcOffset, length);
+    FWD_IF_ERR(mBufferCopier->copy(mDataCopy.get() + dstOffset, mData.get() + srcOffset, length));
     std::swap(mData, mDataCopy);
   }
 
-  mRange->setUsedRange(dstOffset, length);
+  FWD_IF_ERR(mRange->setUsedRange(dstOffset, length));
+
+  return Status_Success;
 }

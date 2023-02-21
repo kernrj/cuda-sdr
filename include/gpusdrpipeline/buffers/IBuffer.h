@@ -17,32 +17,34 @@
 #ifndef GPUSDR_IBUFFER_H
 #define GPUSDR_IBUFFER_H
 
+#include <gpusdrpipeline/GSDefs.h>
+#include <gpusdrpipeline/IRef.h>
 #include <gpusdrpipeline/buffers/IBufferRange.h>
 
 #include <cstdint>
 
-class IBuffer {
+class IBuffer : public virtual IRef {
  public:
-  virtual ~IBuffer() = default;
-
   /**
    * The start of the buffer - what readPtr() returns when offset() is 0.
    */
-  [[nodiscard]] virtual uint8_t* base() = 0;
-  [[nodiscard]] virtual const uint8_t* base() const = 0;
+  [[nodiscard]] virtual uint8_t* base() noexcept = 0;
+  [[nodiscard]] virtual const uint8_t* base() const noexcept = 0;
 
-  [[nodiscard]] virtual IBufferRange* range() = 0;
-  [[nodiscard]] virtual const IBufferRange* range() const = 0;
+  [[nodiscard]] virtual IBufferRange* range() noexcept = 0;
+  [[nodiscard]] virtual const IBufferRange* range() const noexcept = 0;
 
   template <class T = uint8_t>
-  [[nodiscard]] const T* readPtr() const {
+  [[nodiscard]] const T* readPtr() const noexcept {
     return reinterpret_cast<const T*>(base() + range()->offset());
   }
 
   template <class T = uint8_t>
-  [[nodiscard]] T* writePtr() {
+  [[nodiscard]] T* writePtr() noexcept {
     return reinterpret_cast<T*>(base() + range()->endOffset());
   }
+
+  ABSTRACT_IREF(IBuffer);
 };
 
 #endif  // GPUSDR_IBUFFER_H

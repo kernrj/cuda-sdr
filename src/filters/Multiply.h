@@ -22,14 +22,14 @@
 #include "Factories.h"
 #include "filters/BaseFilter.h"
 
-class MultiplyCcc : public BaseFilter {
+class MultiplyCcc final : public BaseFilter {
  public:
-  MultiplyCcc(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories);
-  ~MultiplyCcc() override = default;
+  static Result<Filter> create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept;
 
-  [[nodiscard]] size_t getOutputDataSize(size_t port) override;
-  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) override;
+  [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
+  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
+  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
+  size_t preferredInputBufferSize(size_t port) noexcept final;
 
  private:
   static const size_t mAlignment;
@@ -37,7 +37,15 @@ class MultiplyCcc : public BaseFilter {
   cudaStream_t mCudaStream;
 
  private:
+  MultiplyCcc(
+      int32_t cudaDevice,
+      cudaStream_t cudaStream,
+      IRelocatableResizableBufferFactory* relocatableBufferFactory,
+      IBufferSliceFactory* bufferSliceFactory,
+      IMemSet* memSet) noexcept;
   [[nodiscard]] size_t getAvailableNumInputElements() const;
+
+  REF_COUNTED(MultiplyCcc);
 };
 
 #endif  // SDRTEST_SRC_MULTIPLY_H_

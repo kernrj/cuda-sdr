@@ -17,12 +17,16 @@
 #ifndef GPUSDR_IBUFFERCOPIER_H
 #define GPUSDR_IBUFFERCOPIER_H
 
+#include <gpusdrpipeline/IRef.h>
+#include <gpusdrpipeline/Status.h>
+
 #include <cstddef>
 
-class IBufferCopier {
+class IBufferCopier : public virtual IRef {
  public:
-  virtual ~IBufferCopier() = default;
-  virtual void copy(void* dst, const void* src, size_t length) = 0;
+  [[nodiscard]] virtual Status copy(void* dst, const void* src, size_t length) const noexcept = 0;
+
+  ABSTRACT_IREF(IBufferCopier);
 };
 
 #endif  // GPUSDR_IBUFFERCOPIER_H

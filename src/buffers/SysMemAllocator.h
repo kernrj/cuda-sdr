@@ -18,10 +18,14 @@
 #define GPUSDR_SYSMEMALLOCATOR_H
 
 #include "buffers/IAllocator.h"
-class SysMemAllocator : public IAllocator {
+class SysMemAllocator final : public IAllocator {
  public:
-  ~SysMemAllocator() override = default;
-  std::shared_ptr<uint8_t> allocate(size_t size, size_t* sizeOut) override;
+  Result<IMemory> allocate(size_t size) noexcept final;
+
+ private:
+  static void freeMem(uint8_t* data, void* context) noexcept;
+
+  REF_COUNTED(SysMemAllocator);
 };
 
 #endif  // GPUSDR_SYSMEMALLOCATOR_H

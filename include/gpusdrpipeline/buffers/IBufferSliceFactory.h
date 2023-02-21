@@ -17,32 +17,26 @@
 #ifndef GPUSDR_IBUFFERSLICEFACTORY_H
 #define GPUSDR_IBUFFERSLICEFACTORY_H
 
+#include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/buffers/IBuffer.h>
 
-#include <memory>
-
-class IBufferSliceFactory {
+class IBufferSliceFactory : public virtual IRef {
  public:
-  virtual ~IBufferSliceFactory() = default;
-
   /**
    * Creates a buffer slice, and sets the start and end offsets of the buffer slice to the overlap of the start and end
    * offsets in bufferToSlice.
    */
-  virtual std::shared_ptr<IBuffer> slice(
-      const std::shared_ptr<IBuffer>& bufferToSlice,
-      size_t sliceStartOffset,
-      size_t sliceEndOffset) = 0;
+  virtual Result<IBuffer> slice(IBuffer* bufferToSlice, size_t sliceStartOffset, size_t sliceEndOffset) noexcept = 0;
 
   /**
    * Returns a buffer containing the unused portion of data at the end of another buffer.
    * The start and end offsets of the returned buffer are set to 0 (overlap with the original buffer is 0).
    */
-  virtual std::shared_ptr<IBuffer> sliceRemaining(const std::shared_ptr<IBuffer>& bufferToSlice) {
-    auto bufferSlice = slice(bufferToSlice, bufferToSlice->range()->endOffset(), bufferToSlice->range()->capacity());
-
-    return bufferSlice;
+  Result<IBuffer> sliceRemaining(IBuffer* bufferToSlice) {
+    return slice(bufferToSlice, bufferToSlice->range()->endOffset(), bufferToSlice->range()->capacity());
   }
+
+  ABSTRACT_IREF(IBufferSliceFactory);
 };
 
 #endif  // GPUSDR_IBUFFERSLICEFACTORY_H

@@ -21,16 +21,16 @@
 #include <gpusdrpipeline/buffers/IBufferFactory.h>
 #include <gpusdrpipeline/buffers/IRelocatableResizableBuffer.h>
 
-class IRelocatableCudaBufferFactory {
+class IRelocatableCudaBufferFactory : public virtual IRef {
  public:
-  virtual ~IRelocatableCudaBufferFactory() = default;
-
-  virtual std::shared_ptr<IRelocatableResizableBuffer> createCudaBuffer(
+  virtual Result<IRelocatableResizableBuffer> createCudaBuffer(
       size_t minSize,
       int32_t cudaDevice,
       cudaStream_t cudaStream,
       size_t alignment,
-      bool useHostMemory) = 0;
+      bool useHostMemory) noexcept = 0;
+
+  ABSTRACT_IREF(IRelocatableCudaBufferFactory);
 };
 
 #endif  // GPUSDR_IRELOCATABLECUDABUFFERFACTORY_H

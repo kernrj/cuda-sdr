@@ -22,9 +22,9 @@
 
 class IRelocatableResizableBuffer : public IRelocatable, public IResizableBuffer {
  public:
-  ~IRelocatableResizableBuffer() override = default;
+  Status relocateUsedToStart() noexcept { return relocate(0, range()->offset(), range()->used()); }
 
-  void relocateUsedToStart() { relocate(0, range()->offset(), range()->used()); }
+  ABSTRACT_IREF(IRelocatableResizableBuffer);
 };
 
 #endif  // GPUSDR_IRELOCATABLERESIZABLEBUFFER_H

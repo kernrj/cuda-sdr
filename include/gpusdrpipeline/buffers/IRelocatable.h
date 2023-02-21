@@ -19,11 +19,11 @@
 
 #include <cstddef>
 
-class IRelocatable {
+class IRelocatable : public virtual IRef {
  public:
-  virtual ~IRelocatable() = default;
+  virtual Status relocate(size_t dstOffset, size_t srcOffset, size_t length) noexcept = 0;
 
-  virtual void relocate(size_t dstOffset, size_t srcOffset, size_t length) = 0;
+  ABSTRACT_IREF(IRelocatable);
 };
 
 #endif  // GPUSDR_IRELOCATABLE_H

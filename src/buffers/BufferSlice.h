@@ -24,7 +24,7 @@
  * A buffer which passes operations through to another Buffer, except that the capacity, start offset and end offset can
  * vary.
  */
-class BufferSlice : public IBuffer {
+class BufferSlice final : public IBuffer {
  public:
   /**
    * Creates a slice of [slicedBuffer]. If the used range of [slicedBuffer] overlaps the slice, the used range in this
@@ -34,23 +34,30 @@ class BufferSlice : public IBuffer {
    * @param sliceStart The start offset in slicedBuffer that our offset 0 will refer to.
    * @param sliceEnd The end index (exclusive). This value must be >= sliceStart.
    */
-  BufferSlice(
-      const std::shared_ptr<IBuffer>& slicedBuffer,
+  static Result<IBuffer> create(
+      IBuffer* slicedBuffer,
       size_t sliceStart,
       size_t sliceEnd,
-      const std::shared_ptr<IBufferRangeFactory>& bufferRangeFactory);
-  ~BufferSlice() override = default;
+      IBufferRangeFactory* bufferRangeFactory) noexcept;
 
-  [[nodiscard]] uint8_t* base() override;
-  [[nodiscard]] const uint8_t* base() const override;
+  [[nodiscard]] uint8_t* base() noexcept final;
+  [[nodiscard]] const uint8_t* base() const noexcept final;
 
-  [[nodiscard]] IBufferRange* range() override;
-  [[nodiscard]] const IBufferRange* range() const override;
+  [[nodiscard]] IBufferRange* range() noexcept final;
+  [[nodiscard]] const IBufferRange* range() const noexcept final;
 
  private:
-  const std::shared_ptr<IBuffer> mSlicedBuffer;
-  const std::shared_ptr<IBufferRange> mRange;
+  ConstRef<IBuffer> mSlicedBuffer;
+  ConstRef<IBufferRange> mRange;
   const size_t mSliceStart;
+
+ private:
+  BufferSlice(
+      IBuffer* slicedBuffer,
+      size_t sliceStart,
+      IBufferRange* bufferRange) noexcept;
+
+  REF_COUNTED(BufferSlice);
 };
 
 #endif  // GPUSDR_BUFFERSLICE_H

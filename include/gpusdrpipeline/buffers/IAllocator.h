@@ -14,9 +14,12 @@
  *  limitations under the License.
  */
 
+#include <gpusdrpipeline/IMemory.h>
+#include <gpusdrpipeline/IRef.h>
+#include <gpusdrpipeline/Result.h>
+
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 
 #ifndef GPUSDR_IALLOCATOR_H
 #define GPUSDR_IALLOCATOR_H
@@ -24,18 +27,17 @@
 /**
  * Abstracts the creation and deletion of a memory region.
  */
-class IAllocator {
+class IAllocator : public virtual IRef {
  public:
-  virtual ~IAllocator() = default;
-
   /**
    * Allocates memory at least [size] bytes long.
    *
    * @param size The minimum size of the buffer. Must be > 0. Some implementations may return larger buffers (e.g.
    *             padding for compatibility with vectorized operations).
-   * @param sizeOut If non-null, this is set to the size of the allocated buffer.
    */
-  virtual std::shared_ptr<uint8_t> allocate(size_t size, size_t* sizeOut = nullptr) = 0;
+  virtual Result<IMemory> allocate(size_t size) noexcept = 0;
+
+  ABSTRACT_IREF(IAllocator);
 };
 
 #endif  // GPUSDR_IALLOCATOR_H

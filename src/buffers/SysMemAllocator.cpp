@@ -16,14 +16,19 @@
 
 #include "SysMemAllocator.h"
 
+#include <new>
+
+#include "Memory.h"
+
 using namespace std;
 
-static void deleteData(uint8_t* data) { delete[] data; }
+Result<IMemory> SysMemAllocator::allocate(size_t size) noexcept {
+  auto data = new (nothrow) uint8_t[size];
+  NON_NULL_OR_RET(data);
 
-shared_ptr<uint8_t> SysMemAllocator::allocate(size_t size, size_t* sizeOut) {
-  if (sizeOut != nullptr) {
-    *sizeOut = size;
-  }
+  return makeRefResultNonNull<IMemory>(new (nothrow) Memory(data, size, freeMem, nullptr));
+}
 
-  return {new uint8_t[size], deleteData};
+void SysMemAllocator::freeMem(uint8_t* data, [[maybe_unused]] void* context) noexcept {
+  delete[] data;
 }

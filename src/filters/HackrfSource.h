@@ -23,9 +23,9 @@
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
+#include <list>
 #include <memory>
 #include <mutex>
-#include <queue>
 #include <string>
 #include <vector>
 
@@ -33,42 +33,63 @@
 #include "HackrfSession.h"
 #include "filters/IHackrfSource.h"
 
-class HackrfSource : public IHackrfSource {
+class HackrfSource final : public IHackrfSource {
  public:
-  HackrfSource(uint64_t frequency, double sampleRate, size_t maxBufferCountBeforeDropping, IFactories* factories);
+  static Result<IHackrfSource> create(
+      uint64_t frequency,
+      double sampleRate,
+      size_t maxBufferCountBeforeDropping,
+      IFactories* factories) noexcept;
 
-  std::vector<std::string> getDeviceSerialNumbers() override;
+  int32_t getDeviceCount() const noexcept final;
+  size_t getDeviceSerialNumber(int32_t deviceIndex, char* buffer, size_t bufferSize) const noexcept final;
 
-  void selectDeviceByIndex(int deviceIndex) override;
-  void selectDeviceBySerialNumber(const std::string& serialNumber) override;
+  Status selectDeviceByIndex(int deviceIndex) noexcept final;
+  Status selectDeviceBySerialNumber(const char* serialNumber) noexcept final;
+  Status releaseDevice() noexcept final;
 
-  void start() override;
-  void stop() override;
+  Status start() noexcept final;
+  Status stop() noexcept final;
 
-  size_t getOutputDataSize(size_t port) override;
-  size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) override;
+  size_t getOutputDataSize(size_t port) noexcept final;
+  size_t getOutputSizeAlignment(size_t port) noexcept final;
+  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
+
+  std::chrono::steady_clock::duration getInputTimeout() const noexcept;
+  void setInputTimeout(const std::chrono::steady_clock::duration& timeout) noexcept;
 
  private:
+  static const std::chrono::steady_clock::duration kDefaultInputTimeout;
   HackrfSession mHackrfSession;
 
   const uint64_t mFrequency;
   const double mSampleRate;
-  const std::shared_ptr<IBufferPoolFactory> mBufferPoolFactory;
-  const std::shared_ptr<IBufferCopier> mOutputBufferCopier;
-  const std::shared_ptr<IBufferUtil> mBufferUtil;
+  ConstRef<IBufferPoolFactory> mBufferPoolFactory;
+  ConstRef<IBufferCopier> mOutputBufferCopier;
+  ConstRef<IBufferUtil> mBufferUtil;
+  std::chrono::steady_clock::duration mInputTimeout;
 
   std::mutex mMutex;
   std::condition_variable mOutputBufferAvailable;
 
-  std::shared_ptr<IBufferPool> mBufferPool;
+  Ref<IBufferPool> mBufferPool;
   std::shared_ptr<hackrf_device> mHackrfDevice;
-  std::queue<std::shared_ptr<IBuffer>> mBuffersAvailableToOutput;
+  std::list<ImmutableRef<IBuffer>> mBuffersAvailableToOutput;
   bool mStarted;
 
  private:
-  static int rxCallbackWrapper(hackrf_transfer* transfer);
-  int rxCallback(hackrf_transfer* transfer);
+  HackrfSource(
+      uint64_t frequency,
+      double sampleRate,
+      IBufferPoolFactory* bufferPoolFactory,
+      IBufferCopier* outputBufferCopier,
+      IBufferUtil* bufferUtil) noexcept;
+
+  static int rxCallbackWrapper(hackrf_transfer* transfer) noexcept;
+  int rxCallback(hackrf_transfer* transfer) noexcept;
+  Status waitForInputBuffer(std::unique_lock<std::mutex>& lock) noexcept;
+
+  REF_COUNTED(HackrfSource);
 };
 
 #endif  // SDRTEST_SRC_HACKRFSOURCE_H_

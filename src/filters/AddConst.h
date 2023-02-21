@@ -24,14 +24,17 @@
 #include "buffers/IRelocatableResizableBufferFactory.h"
 #include "filters/BaseFilter.h"
 
-class AddConst : public BaseFilter {
+class AddConst final : public BaseFilter {
  public:
-  AddConst(float addValueToMagnitude, int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories);
-  ~AddConst() override = default;
+  static Result<Filter> create(
+      float addValueToMagnitude,
+      int32_t cudaDevice,
+      cudaStream_t cudaStream,
+      IFactories* factories) noexcept;
 
-  [[nodiscard]] size_t getOutputDataSize(size_t port) override;
-  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) override;
-  void readOutput(const std::vector<std::shared_ptr<IBuffer>>& portOutputs) override;
+  [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
+  [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
+  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
 
  private:
   static const size_t mAlignment;
@@ -40,7 +43,18 @@ class AddConst : public BaseFilter {
   cudaStream_t mCudaStream;
 
  private:
-  [[nodiscard]] size_t getAvailableNumInputElements() const;
+  [[nodiscard]] size_t getAvailableNumInputElements() const noexcept;
+
+ private:
+  AddConst(
+      float addConst,
+      int32_t cudaDevice,
+      cudaStream_t cudaStream,
+      IRelocatableResizableBufferFactory* relocatableBufferFactory,
+      IBufferSliceFactory* bufferSliceFactory,
+      IMemSet* memSet) noexcept;
+
+  REF_COUNTED(AddConst);
 };
 
 #endif  // SDRTEST_SRC_ADDCONST_H_

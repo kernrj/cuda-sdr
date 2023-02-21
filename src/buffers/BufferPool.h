@@ -28,28 +28,30 @@
 #include "buffers/IBufferFactory.h"
 #include "buffers/IBufferPool.h"
 
-class BufferPool : public IBufferPool {
+class BufferPool final : public IBufferPool {
  public:
-  BufferPool(size_t maxBufferCount, size_t bufferSize, const std::shared_ptr<IBufferFactory>& bufferFactory);
+  BufferPool(size_t maxBufferCount, size_t bufferSize, IBufferFactory* bufferFactory);
 
-  [[nodiscard]] size_t getBufferSize() const override;
-  [[nodiscard]] std::shared_ptr<IBuffer> getBuffer() override;
-  [[nodiscard]] std::optional<std::shared_ptr<IBuffer>> tryGetBuffer() override;
+  [[nodiscard]] size_t getBufferSize() const noexcept final;
+  [[nodiscard]] Result<IBuffer> getBuffer() noexcept final;
+  [[nodiscard]] Result<IBuffer> tryGetBuffer() noexcept final;
 
  private:
-  [[nodiscard]] std::shared_ptr<IBuffer> createSpWrapperToReturnToPool(const std::shared_ptr<IBuffer>& originalBuffer);
+  [[nodiscard]] Result<IBuffer> createWrapperToReturnToPool(IBuffer* originalBuffer);
 
  private:
   const size_t mMaxBufferCount;
   const size_t mBufferSize;
-  const std::shared_ptr<IBufferFactory> mBufferFactory;
-  std::vector<std::shared_ptr<IBuffer>> mAllBuffers;
-  const std::shared_ptr<std::queue<std::shared_ptr<IBuffer>>> mAvailableBuffers;
+  ConstRef<IBufferFactory> mBufferFactory;
+  std::vector<ImmutableRef<IBuffer>> mAllBuffers;
+  const std::shared_ptr<std::queue<ImmutableRef<IBuffer>>> mAvailableBuffers;
   std::mutex mMutex;
   std::condition_variable mBufferReturnedCv;
 
  private:
-  [[nodiscard]] std::optional<std::shared_ptr<IBuffer>> tryGetBufferLocked();
+  Result<IBuffer> tryGetBufferLocked() noexcept;
+
+  REF_COUNTED(BufferPool);
 };
 
 #endif  // GPUSDR_BUFFERPOOL_H

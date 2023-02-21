@@ -20,12 +20,12 @@
 #include <gpusdrpipeline/buffers/IResizableBuffer.h>
 
 #include <cstddef>
-#include <memory>
 
-class IResizableBufferFactory {
+class IResizableBufferFactory : public virtual IRef {
  public:
-  virtual ~IResizableBufferFactory() = default;
-  virtual std::shared_ptr<IResizableBuffer> createResizableBuffer(size_t size) = 0;
+  virtual Result<IResizableBuffer> createResizableBuffer(size_t size) noexcept = 0;
+
+  ABSTRACT_IREF(IResizableBufferFactory);
 };
 
 #endif  // GPUSDR_IRESIZABLEBUFFERFACTORY_H

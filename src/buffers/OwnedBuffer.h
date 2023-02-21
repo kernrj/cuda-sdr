@@ -17,28 +17,31 @@
 #ifndef GPUSDR_OWNEDBUFFER_H
 #define GPUSDR_OWNEDBUFFER_H
 
+#include "IMemory.h"
 #include "buffers/IBuffer.h"
 #include "buffers/IBufferRangeFactory.h"
 
-class OwnedBuffer : public IBuffer {
+class OwnedBuffer final : public IBuffer {
  public:
-  OwnedBuffer(
-      size_t capacity,
+  static Result<IBuffer> create(
       size_t offset,
       size_t end,
-      const std::shared_ptr<uint8_t>& buffer,
-      const std::shared_ptr<IBufferRangeFactory>& bufferRangeFactory);
+      IMemory* memory,
+      IBufferRangeFactory* bufferRangeFactory) noexcept;
 
-  ~OwnedBuffer() override = default;
-
-  [[nodiscard]] uint8_t* base() override;
-  [[nodiscard]] const uint8_t* base() const override;
-  [[nodiscard]] IBufferRange* range() override;
-  [[nodiscard]] const IBufferRange* range() const override;
+  [[nodiscard]] uint8_t* base() noexcept final;
+  [[nodiscard]] const uint8_t* base() const noexcept final;
+  [[nodiscard]] IBufferRange* range() noexcept final;
+  [[nodiscard]] const IBufferRange* range() const noexcept final;
 
  private:
-  std::shared_ptr<uint8_t> mBuffer;
-  std::shared_ptr<IBufferRange> mRange;
+  ConstRef<IMemory> mData;
+  ConstRef<IBufferRange> mRange;
+
+ private:
+  OwnedBuffer(IMemory* memory, IBufferRange* bufferRange) noexcept;
+
+  REF_COUNTED(OwnedBuffer);
 };
 
 #endif  // GPUSDR_OWNEDBUFFER_H

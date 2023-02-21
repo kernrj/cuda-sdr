@@ -18,18 +18,19 @@
 #define GPUSDR_ICUDABUFFERCOPIERFACTORY_H
 
 #include <cuda_runtime.h>
+#include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/buffers/IBufferCopier.h>
 
 #include <cstdint>
-#include <memory>
 
-class ICudaBufferCopierFactory {
+class ICudaBufferCopierFactory : public virtual IRef {
  public:
-  virtual ~ICudaBufferCopierFactory() = default;
-  virtual std::shared_ptr<IBufferCopier> createBufferCopier(
+  virtual Result<IBufferCopier> createBufferCopier(
       int32_t cudaDevice,
       cudaStream_t cudaStream,
-      cudaMemcpyKind memcpyKind) = 0;
+      cudaMemcpyKind memcpyKind) noexcept = 0;
+
+  ABSTRACT_IREF(ICudaBufferCopierFactory);
 };
 
 #endif  // GPUSDR_ICUDABUFFERCOPIERFACTORY_H

@@ -19,8 +19,8 @@
 using namespace std;
 
 BaseFilter::BaseFilter(
-    const std::shared_ptr<IRelocatableResizableBufferFactory>& relocatableResizableBufferFactory,
-    const std::shared_ptr<IBufferSliceFactory>& slicedBufferFactory,
+    IRelocatableResizableBufferFactory* relocatableResizableBufferFactory,
+    IBufferSliceFactory* slicedBufferFactory,
     size_t inputPortCount,
-    const std::shared_ptr<IMemSet>& memSet)
+    IMemSet* memSet) noexcept
     : BaseSink(relocatableResizableBufferFactory, slicedBufferFactory, inputPortCount, memSet) {}

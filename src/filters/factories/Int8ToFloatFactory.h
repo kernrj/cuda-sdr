@@ -1,6 +1,18 @@
-//
-// Created by Rick Kern on 1/8/23.
-//
+/*
+ * Copyright 2023 Rick Kern <kernrj@gmail.com>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 
 #ifndef GPUSDRPIPELINE_INT8TOFLOATFACTORY_H
 #define GPUSDRPIPELINE_INT8TOFLOATFACTORY_H
@@ -9,18 +21,19 @@
 #include "Factories.h"
 #include "filters/FilterFactories.h"
 
-class Int8ToFloatFactory : public ICudaFilterFactory {
+class Int8ToFloatFactory final : public ICudaFilterFactory {
  public:
-  explicit Int8ToFloatFactory(IFactories* factories)
+  explicit Int8ToFloatFactory(IFactories* factories) noexcept
       : mFactories(factories) {}
-  ~Int8ToFloatFactory() override = default;
 
-  std::shared_ptr<Filter> createFilter(int32_t cudaDevice, cudaStream_t cudaStream) override {
-    return std::make_shared<Int8ToFloat>(cudaDevice, cudaStream, mFactories);
+  Result<Filter> createFilter(int32_t cudaDevice, cudaStream_t cudaStream) noexcept final {
+    return Int8ToFloat::create(cudaDevice, cudaStream, mFactories);
   }
 
  private:
-  IFactories* const mFactories;
+  ConstRef<IFactories> mFactories;
+
+  REF_COUNTED(Int8ToFloatFactory);
 };
 
 #endif  // GPUSDRPIPELINE_INT8TOFLOATFACTORY_H
