@@ -57,7 +57,7 @@ static void exitSigHandler(int signum) {
     return;
   }
 
-  gslog(GSLOG_INFO, "Caught signal %d, cleaning up.", signum);
+  gslogi("Caught signal %d, cleaning up.", signum);
   cleanupThings();
 
   if (signum == SIGINT || signum == SIGTERM) {
@@ -215,23 +215,20 @@ class NbfmTest {
         audioFileWriter(unwrap(
             factories->getAacFileWriterFactory()
                 ->createAacFileWriter(outputAudioFile, audioSampleRate, outputAudioBitRate, cudaDevice, cudaStream))) {
-    gslog(GSLOG_INFO, "Input file [%s]", inputFileName);
-    gslog(
-        GSLOG_INFO,
+    gslogi("Input file [%s]", inputFileName);
+    gslogi(
         "Output file [%s] sample rate [%zu] bit rate [%d]",
         outputAudioFile,
         audioSampleRate,
         outputAudioBitRate);
-    gslog(GSLOG_INFO, "CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
-    gslog(
-        GSLOG_INFO,
+    gslogi("CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
+    gslogi(
         "Channel frequency [%f], center frequency [%f] channel width [%f]",
         channelFrequency,
         centerFrequency,
         channelWidth);
-    gslog(GSLOG_INFO, "RF sample rate [%f]", rfSampleRate);
-    gslog(
-        GSLOG_INFO,
+    gslogi("RF sample rate [%f]", rfSampleRate);
+    gslogi(
         "RF Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]",
         rfLowPassCutoffFrequency,
         rfLowPassTransitionWidth,
@@ -239,27 +236,26 @@ class NbfmTest {
         rfLowPassDecimation,
         mRfLowPassTaps.size());
 
-    gslog(
-        GSLOG_INFO,
+    gslogi(
         "Audio Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]",
         audioLowPassCutoffFrequency,
         audioLowPassTransitionWidth,
         audioLowPassDbAttenuation,
         audioLowPassDecimation,
         mAudioLowPassTaps.size());
-    gslog(GSLOG_INFO, "Cosine source frequency [%f]", centerFrequency - channelFrequency);
-    gslog(GSLOG_INFO, "Quad demod gain [%f]", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
+    gslogi("Cosine source frequency [%f]", centerFrequency - channelFrequency);
+    gslogi("Quad demod gain [%f]", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
   }
 
   void start() {
     if (!useFileInput) {
-      hackrfSource->start();
+      THROW_IF_ERR(hackrfSource->start());
     }
   }
 
   void stop() {
     if (!useFileInput) {
-      hackrfSource->stop();
+      THROW_IF_ERR(hackrfSource->stop());
     }
   }
 
@@ -285,7 +281,6 @@ class NbfmTest {
         gpuFloatSource = hostToDevice.get();
       } else {
         size_t hackrfBufferLength = hackrfSource->getAlignedOutputDataSize(0);
-        const size_t hackRfInputSampleCount = hackrfBufferLength / 2;  // samples alternates between real and imaginary
 
         ConstRef<IBuffer> hackrfHostSamples = unwrap(hostToDevice->requestBuffer(0, hackrfBufferLength));
 
@@ -307,10 +302,6 @@ class NbfmTest {
           unwrap(multiplyRfSourceByCosine->requestBuffer(0, gpuFloatSource->getAlignedOutputDataSize(0)));
       ConstRef<IBuffer> cosineMultiplyInput =
           unwrap(multiplyRfSourceByCosine->requestBuffer(1, gpuFloatSource->getAlignedOutputDataSize(0)));
-
-      size_t multiplyInputSampleCount =
-          min(rfMultiplyInput->range()->remaining() / sizeof(cuComplex),
-              cosineMultiplyInput->range()->remaining() / sizeof(cuComplex));
 
       outputBuffers[0] = rfMultiplyInput;
       THROW_IF_ERR(gpuFloatSource->readOutput(outputBuffers.data(), 1));
@@ -363,6 +354,8 @@ class NbfmTest {
       wroteSampleCount += audioEncMuxInputBuffer->range()->used() / sizeof(float);
       THROW_IF_ERR(audioFileWriter->commitBuffer(0, audioEncMuxInputBuffer->range()->used()));
     }
+
+    return Status_Success;
   }
 
  private:
@@ -458,15 +451,15 @@ static ImmutableRef<Source> createHackrfInputPipeline(
   auto int8ToFloat = unwrap(factories->getInt8ToFloatFactory()->createFilter(cudaDevice, cudaStream));
 
   auto driver = unwrap(factories->getFilterDriverFactory()->createFilterDriver());
-  driver->connect(hackrfInput, 0, hostToDevice, 0);
-  driver->connect(hostToDevice, 0, int8ToFloat, 0);
+  THROW_IF_ERR(driver->connect(hackrfInput, 0, hostToDevice, 0));
+  THROW_IF_ERR(driver->connect(hostToDevice, 0, int8ToFloat, 0));
   driver->setDriverOutput(int8ToFloat);
 
-  driver->setupNode(hackrfInput, "Get HackRF samples");
-  driver->setupNode(hostToDevice, "Copy HackRF samples to GPU memory");
-  driver->setupNode(int8ToFloat, "Convert HackRF complex int8 format to complex float");
+  THROW_IF_ERR(driver->setupNode(hackrfInput, "Get HackRF samples"));
+  THROW_IF_ERR(driver->setupNode(hostToDevice, "Copy HackRF samples to GPU memory"));
+  THROW_IF_ERR(driver->setupNode(int8ToFloat, "Convert HackRF complex int8 format to complex float"));
 
-  runAtExit.emplace([hackrfInput]() { hackrfInput->releaseDevice(); });
+  runAtExit.emplace([hackrfInput]() { THROW_IF_ERR(hackrfInput->releaseDevice()); });
 
   return ImmutableRef<Source>(driver);
 }
@@ -487,10 +480,10 @@ static ImmutableRef<Sink> createAacFileOutputPipeline(
   auto driver = unwrap(factories->getFilterDriverFactory()->createFilterDriver());
 
   driver->setDriverInput(deviceToHost);
-  driver->connect(deviceToHost, 0, audioOutput, 0);
+  THROW_IF_ERR(driver->connect(deviceToHost, 0, audioOutput, 0));
 
-  driver->setupNode(deviceToHost, "Copy audio samples from GPU to System Memory");
-  driver->setupNode(audioOutput, "Encode and mux audio to a file");
+  THROW_IF_ERR(driver->setupNode(deviceToHost, "Copy audio samples from GPU to System Memory"));
+  THROW_IF_ERR(driver->setupNode(audioOutput, "Encode and mux audio to a file"));
 
   *outputByteCountWritten = deviceToHost;
 
@@ -500,7 +493,7 @@ static ImmutableRef<Sink> createAacFileOutputPipeline(
 int doAm();
 int doFm();
 
-int main(int argc, char** argv) { return doAm(); }
+int main() { return doAm(); }
 
 int doAm() {
   atexit(cleanupThings);
@@ -551,7 +544,7 @@ int doAm() {
       cudaDevice,
       cudaStream);
 
-  auto rfToAudio = factories->getRfToPcmAudioFactory()->create(
+  auto rfToAudio = unwrap(factories->getRfToPcmAudioFactory()->create(
       rfSampleRate,
       modulation,
       rfLowPassDecim,
@@ -563,22 +556,22 @@ int doAm() {
       rfLowPassDbAttenuation,
       audioLowPassDbAttenuation,
       cudaDevice,
-      cudaStream);
+      cudaStream));
 
   auto driver = unwrap(factories->getSteppingDriverFactory()->createSteppingDriver());
 
-  driver->connect(inputPipeline.get(), 0, rfToAudio, 0);
-  driver->connect(rfToAudio, 0, outputPipeline, 0);
+  THROW_IF_ERR(driver->connect(inputPipeline.get(), 0, rfToAudio, 0));
+  THROW_IF_ERR(driver->connect(rfToAudio, 0, outputPipeline, 0));
 
-  driver->setupNode(inputPipeline.get(), "RF Input Pipeline");
-  driver->setupNode(rfToAudio, "Convert RF signal to audio");
-  driver->setupNode(outputPipeline, "Audio Output Pipeline");
+  THROW_IF_ERR(driver->setupNode(inputPipeline.get(), "RF Input Pipeline"));
+  THROW_IF_ERR(driver->setupNode(rfToAudio, "Convert RF signal to audio"));
+  THROW_IF_ERR(driver->setupNode(outputPipeline, "Audio Output Pipeline"));
 
   const size_t maxSampleCount = audioSampleRate * 60;
 
   size_t itCount = 0;
   while (readByteCountMonitor->getByteCountRead(0) / sizeof(float) < maxSampleCount) {
-    driver->doFilter();
+    THROW_IF_ERR(driver->doFilter());
 
     /*
     itCount++;
@@ -640,7 +633,7 @@ int doFm() {
       cudaDevice,
       cudaStream);
 
-  auto rfToAudio = factories->getRfToPcmAudioFactory()->create(
+  auto rfToAudio = unwrap(factories->getRfToPcmAudioFactory()->create(
       rfSampleRate,
       modulation,
       rfLowPassDecim,
@@ -652,22 +645,22 @@ int doFm() {
       rfLowPassDbAttenuation,
       audioLowPassDbAttenuation,
       cudaDevice,
-      cudaStream);
+      cudaStream));
 
   auto driver = unwrap(factories->getSteppingDriverFactory()->createSteppingDriver());
 
-  driver->connect(inputPipeline.get(), 0, rfToAudio, 0);
-  driver->connect(rfToAudio, 0, outputPipeline, 0);
+  THROW_IF_ERR(driver->connect(inputPipeline.get(), 0, rfToAudio, 0));
+  THROW_IF_ERR(driver->connect(rfToAudio, 0, outputPipeline, 0));
 
-  driver->setupNode(inputPipeline.get(), "RF Input Pipeline");
-  driver->setupNode(rfToAudio, "Convert RF signal to audio");
-  driver->setupNode(outputPipeline, "Audio Output Pipeline");
+  THROW_IF_ERR(driver->setupNode(inputPipeline.get(), "RF Input Pipeline"));
+  THROW_IF_ERR(driver->setupNode(rfToAudio, "Convert RF signal to audio"));
+  THROW_IF_ERR(driver->setupNode(outputPipeline, "Audio Output Pipeline"));
 
   const size_t maxSampleCount = audioSampleRate * 60;
 
   size_t itCount = 0;
   while (readByteCountMonitor->getByteCountRead(0) / sizeof(float) < maxSampleCount) {
-    driver->doFilter();
+    THROW_IF_ERR(driver->doFilter());
 
     /*
     itCount++;

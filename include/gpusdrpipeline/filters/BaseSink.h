@@ -55,6 +55,7 @@ class BaseSink : public virtual Sink {
  protected:
   [[nodiscard]] Result<IBuffer> getPortInputBuffer(size_t port) noexcept;
   [[nodiscard]] Result<const IBuffer> getPortInputBuffer(size_t port) const noexcept;
+  [[nodiscard]] bool inputPortsInitialized() const noexcept;
 
   /**
    * Increases the offset of the port's buffer by numBytes, then moves the available used bytes to the start of the
@@ -67,7 +68,7 @@ class BaseSink : public virtual Sink {
   ConstRef<IBufferSliceFactory> mSlicedBufferFactory;
   std::vector<InputPort> mInputPorts;
   ConstRef<IMemSet> mMemSet;
-  IRelocatableResizableBufferFactory* const mRelocatableResizableBufferFactory;
+  ConstRef<IRelocatableResizableBufferFactory> mRelocatableResizableBufferFactory;
 
  private:
   [[nodiscard]] std::vector<InputPort> createInputPorts();

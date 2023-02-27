@@ -21,7 +21,7 @@
 
 class IDriverToDiagramFactory : public virtual IRef {
  public:
-  virtual Result<IDriverToDiagram> create() const = 0;
+  [[nodiscard]] virtual Result<IDriverToDiagram> create() const = 0;
 
   ABSTRACT_IREF(IDriverToDiagramFactory);
 };

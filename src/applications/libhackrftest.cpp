@@ -31,8 +31,7 @@
   do {                                                          \
     int status = (__cmd);                                       \
     if (status != HACKRF_SUCCESS) {                             \
-      gslog(                                                    \
-          GSLOG_ERROR,                                          \
+      gsloge(                                                    \
           "%s - Error %s (%d)",                                 \
           (__errorMsg),                                         \
           hackrf_error_name(static_cast<hackrf_error>(status)), \
@@ -57,7 +56,7 @@ static void cleanupThings() {
 }
 
 static void exitSigHandler(int signum) {
-  gslog(GSLOG_INFO, "Caught signal %d, cleaning up.", signum);
+  gslogi("Caught signal %d, cleaning up.", signum);
   cleanupThings();
 
   if (signum == SIGINT || signum == SIGTERM) {
@@ -73,8 +72,7 @@ static int rx_callback(hackrf_transfer* transfer) {
     return 0;
   }
 
-  gslog(
-      GSLOG_INFO,
+  gslogi(
       "Buffer size %d %hhd %hhd %hhd %hhd",
       transfer->valid_length,
       transfer->buffer[0],
@@ -100,42 +98,42 @@ int main(int argc, char** argv) {
   }
 
   runAtExit.push([]() {
-    gslog(GSLOG_INFO, "Cleaning up hackrf");
+    gslogi("Cleaning up hackrf");
     hackrf_exit();
   });
 
-  gslog(GSLOG_INFO, "HackRF was initialized. Getting device list.");
+  gslogi("HackRF was initialized. Getting device list.");
 
   hackrf_device_list_t* deviceList = hackrf_device_list();
-  gslog(GSLOG_INFO, "Device list %p", deviceList);
-  gslog(GSLOG_INFO, "Device count %d usb %d", deviceList->devicecount, deviceList->usb_devicecount);
+  gslogi("Device list %p", deviceList);
+  gslogi("Device count %d usb %d", deviceList->devicecount, deviceList->usb_devicecount);
   runAtExit.push([deviceList]() {
-    gslog(GSLOG_INFO, "Freeing device list %p", deviceList);
+    gslogi("Freeing device list %p", deviceList);
     hackrf_device_list_free(deviceList);
   });
 
   if (deviceList->devicecount <= 0) {
-    gslog(GSLOG_ERROR, "No HackRF devices found");
+    gsloge("No HackRF devices found");
     return ENODEV;
   }
 
   if (deviceIndex >= deviceList->devicecount) {
-    gslog(GSLOG_ERROR, "Device with index [%d] does not exist. Max is %d.", deviceIndex, deviceList->devicecount);
+    gsloge("Device with index [%d] does not exist. Max is %d.", deviceIndex, deviceList->devicecount);
 
     return ENODEV;
   }
 
   hackrf_device* device = nullptr;
   SAFERF_RET(hackrf_device_list_open(deviceList, deviceIndex, &device), "Error opening HackRF device");
-  gslog(GSLOG_INFO, "Opened device %d", deviceIndex);
+  gslogi("Opened device %d", deviceIndex);
 
   for (int i = 0; i < deviceList->devicecount; i++) {
     const char* sn = deviceList->serial_numbers[i];
-    gslog(GSLOG_INFO, "Device [%d] Serial No [%s]", i, sn);
+    gslogi("Device [%d] Serial No [%s]", i, sn);
   }
 
   runAtExit.push([device]() {
-    gslog(GSLOG_INFO, "Closing device %p", device);
+    gslogi("Closing device %p", device);
     hackrf_close(device);
   });
 
@@ -148,6 +146,6 @@ int main(int argc, char** argv) {
     wasInterruptedCv.wait(lock);
   }
 
-  gslog(GSLOG_INFO, "Done");
+  gslogi("Done");
   return 0;
 }

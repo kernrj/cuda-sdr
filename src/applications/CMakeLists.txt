@@ -48,6 +48,7 @@ set(GENERATED_HEADER_DIR "${CMAKE_BINARY_DIR}/include")
 add_executable(sdrtest sdrtest.cpp)
 set_target_properties(sdrtest PROPERTIES CUDA_ARCHITECTURES "${PROJ_CUDA_ARCHITECTURES}")
 target_link_libraries(sdrtest PRIVATE ${LIB_TARGET_NAME})
+proj_set_default_warning_flags(sdrtest PRIVATE)
 target_include_directories(
     sdrtest
     SYSTEM PRIVATE
@@ -60,6 +61,7 @@ target_include_directories(
 add_executable(nbfm_test nbfm_test.cpp)
 set_target_properties(nbfm_test PROPERTIES CUDA_ARCHITECTURES "${PROJ_CUDA_ARCHITECTURES}")
 target_link_libraries(nbfm_test PRIVATE ${LIB_TARGET_NAME})
+proj_set_default_warning_flags(nbfm_test PRIVATE)
 target_include_directories(
     nbfm_test
     SYSTEM PRIVATE
@@ -71,6 +73,7 @@ target_include_directories(
 add_executable(am_test am_test.cpp)
 set_target_properties(am_test PROPERTIES CUDA_ARCHITECTURES "${PROJ_CUDA_ARCHITECTURES}")
 target_link_libraries(am_test PRIVATE ${LIB_TARGET_NAME})
+proj_set_default_warning_flags(am_test PRIVATE)
 target_include_directories(
     am_test
     SYSTEM PRIVATE
@@ -82,6 +85,7 @@ target_include_directories(
 add_executable(digital_to_audio 145.45_digital_signal_to_audio.cpp)
 set_target_properties(digital_to_audio PROPERTIES CUDA_ARCHITECTURES "${PROJ_CUDA_ARCHITECTURES}")
 target_link_libraries(digital_to_audio PRIVATE ${LIB_TARGET_NAME})
+proj_set_default_warning_flags(digital_to_audio PRIVATE)
 target_include_directories(
     digital_to_audio
     SYSTEM PRIVATE
@@ -93,6 +97,7 @@ target_include_directories(
 add_executable(test_server test_server.cpp "${mongoose_SOURCE_DIR}/mongoose.c")
 set_target_properties(test_server PROPERTIES CUDA_ARCHITECTURES all)
 target_link_libraries(test_server PRIVATE ${LIB_TARGET_NAME})
+proj_set_default_warning_flags(test_server PRIVATE)
 target_include_directories(
     test_server
     SYSTEM PRIVATE
@@ -104,6 +109,7 @@ target_include_directories(
 
 add_executable(fm_simpletest fm_simpletest.cpp)
 set_target_properties(fm_simpletest PROPERTIES CUDA_ARCHITECTURES "${PROJ_CUDA_ARCHITECTURES}")
+proj_set_default_warning_flags(fm_simpletest PRIVATE)
 target_include_directories(
     fm_simpletest
     SYSTEM PRIVATE

@@ -36,3 +36,8 @@ Status PortRemappingSink::commitBuffer(size_t port, size_t byteCount) noexcept {
 
   return Status_Success;
 }
+
+size_t PortRemappingSink::preferredInputBufferSize(size_t port) noexcept {
+  GS_REQUIRE_OR_ABORT(mPortMap.find(port) != mPortMap.end(), "Port not found");
+  return mMapToSink->preferredInputBufferSize(mPortMap[port]);
+}

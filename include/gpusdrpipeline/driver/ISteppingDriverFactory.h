@@ -21,7 +21,7 @@
 
 class ISteppingDriverFactory : public virtual IRef {
  public:
-  virtual Result<ISteppingDriver> createSteppingDriver() noexcept = 0;
+  [[nodiscard]] virtual Result<ISteppingDriver> createSteppingDriver() noexcept = 0;
 
   ABSTRACT_IREF(ISteppingDriverFactory);
 };

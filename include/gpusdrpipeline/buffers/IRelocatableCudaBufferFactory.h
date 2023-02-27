@@ -23,7 +23,7 @@
 
 class IRelocatableCudaBufferFactory : public virtual IRef {
  public:
-  virtual Result<IRelocatableResizableBuffer> createCudaBuffer(
+  [[nodiscard]] virtual Result<IRelocatableResizableBuffer> createCudaBuffer(
       size_t minSize,
       int32_t cudaDevice,
       cudaStream_t cudaStream,

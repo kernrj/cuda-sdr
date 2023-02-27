@@ -23,7 +23,7 @@
 
 class IReadByteCountMonitor : public Filter {
  public:
-  virtual size_t getByteCountRead(size_t port) noexcept = 0;
+  [[nodiscard]] virtual size_t getByteCountRead(size_t port) noexcept = 0;
 
   ABSTRACT_IREF(IReadByteCountMonitor);
 };

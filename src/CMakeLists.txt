@@ -228,22 +228,11 @@ target_link_libraries(${LIB_TARGET_NAME}
     CUDA::cudart
 )
 
-if (MSVC)
-    target_compile_options(${LIB_TARGET_NAME} PRIVATE /W4)
-else ()
-    target_compile_options(
-        ${LIB_TARGET_NAME}
-        PRIVATE
-        -Wall
-        -Wextra
-        -Werror=unused-result
-        -Werror=return-type
-        -Werror=final-dtor-non-final-class
-        -Wno-return-type-c-linkage
-    )
-endif ()
+proj_set_default_warning_flags(${LIB_TARGET_NAME} PRIVATE)
 
-target_compile_definitions(${LIB_TARGET_NAME} PRIVATE $<$<CONFIG:Debug>:DEBUG>>)
+if (CMAKE_BUILD_TYPE EQUAL "DEBUG" OR CMAKE_BUILD_TYPE EQUAL "RELWITHDEBINFO")
+    target_compile_definitions(${LIB_TARGET_NAME} PRIVATE DEBUG)
+endif()
 
 include(GenerateExportHeader)
 

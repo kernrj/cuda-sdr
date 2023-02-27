@@ -36,7 +36,7 @@ static void initLogger() noexcept {
   gLogLevel = GSLOG_INFO;
 #endif
 
-  gLogger = new (nothrow) FileLogger(stdout, /* closeWhenDone= */ false);
+  gLogger = new (nothrow) FileLogger(stderr, /* closeWhenDone= */ false);
 }
 
 static void ensureInit() noexcept { call_once(gInitOnceFlag, initLogger); }
@@ -51,37 +51,37 @@ static ImmutableRef<ILogger> getLogger() noexcept {
 GS_C_LINKAGE const char* gslogLevelName(LogLevel level) noexcept {
   switch (level) {
     case GSLOG_TRACE:
-      return "trace";
+      return "TRACE";
     case GSLOG_DEBUG:
-      return "debug";
+      return "DEBUG";
     case GSLOG_INFO:
-      return "info";
+      return "INFO";
     case GSLOG_WARN:
-      return "warn";
+      return "WARN";
     case GSLOG_ERROR:
-      return "error";
+      return "ERROR";
     case GSLOG_FATAL:
-      return "fatal";
+      return "FATAL";
     default:
-      return "unknown_log_level";
+      return "UNKNOWN";
   }
 }
 
-GS_C_LINKAGE void gsSetLogger(ILogger* logger) noexcept {
+GS_C_LINKAGE void gslogSetLogger(ILogger* logger) noexcept {
   ensureInit();
 
   lock_guard<mutex> l(gLogLock);
   gLogger = logger;
 }
 
-GS_C_LINKAGE void gsSetLogVerbosity(LogLevel logLevel) noexcept {
+GS_C_LINKAGE void gslogSetVerbosity(LogLevel logLevel) noexcept {
   ensureInit();
 
   lock_guard<mutex> l(gLogLock);
   gLogLevel = logLevel;
 }
 
-GS_C_LINKAGE void gslog(LogLevel level, GS_FMT_STR(const char* fmt), ...) noexcept {
+static void gslog(LogLevel level, GS_FMT_STR(const char* fmt), ...) noexcept {
   if (level < gLogLevel) {
     return;
   }
@@ -100,4 +100,68 @@ GS_C_LINKAGE void gsvlog(LogLevel level, GS_FMT_STR(const char* fmt), va_list ar
   }
 
   getLogger()->log(level, fmt, args);
+}
+
+GS_C_LINKAGE void gslogt(GS_FMT_STR(const char* fmt), ...) noexcept {
+  if (gLogLevel > GSLOG_TRACE) {
+    return;
+  }
+
+  va_list args;
+  va_start(args, fmt);
+  getLogger()->log(GSLOG_TRACE, fmt, args);
+  va_end(args);
+}
+
+GS_C_LINKAGE void gslogd(GS_FMT_STR(const char* fmt), ...) noexcept {
+  if (gLogLevel > GSLOG_DEBUG) {
+    return;
+  }
+
+  va_list args;
+  va_start(args, fmt);
+  getLogger()->log(GSLOG_DEBUG, fmt, args);
+  va_end(args);
+}
+
+GS_C_LINKAGE void gslogi(GS_FMT_STR(const char* fmt), ...) noexcept {
+  if (gLogLevel > GSLOG_INFO) {
+    return;
+  }
+
+  va_list args;
+  va_start(args, fmt);
+  getLogger()->log(GSLOG_INFO, fmt, args);
+  va_end(args);
+}
+
+GS_C_LINKAGE void gslogw(GS_FMT_STR(const char* fmt), ...) noexcept {
+  if (gLogLevel > GSLOG_WARN) {
+    return;
+  }
+
+  va_list args;
+  va_start(args, fmt);
+  getLogger()->log(GSLOG_WARN, fmt, args);
+  va_end(args);
+}
+
+GS_C_LINKAGE void gsloge(GS_FMT_STR(const char* fmt), ...) noexcept {
+  if (gLogLevel > GSLOG_ERROR) {
+    return;
+  }
+
+  va_list args;
+  va_start(args, fmt);
+  getLogger()->log(GSLOG_ERROR, fmt, args);
+  va_end(args);
+}
+
+GS_C_LINKAGE void gslogf(GS_FMT_STR(const char* fmt), ...) noexcept {
+  va_list args;
+  va_start(args, fmt);
+  getLogger()->log(GSLOG_FATAL, fmt, args);
+  va_end(args);
+
+  abort();
 }

@@ -36,22 +36,22 @@ class QuadDemodFactory final : public IQuadDemodFactory {
       cudaStream_t cudaStream) noexcept final {
     switch (modulation) {
       case Modulation_Am:
-        gslog(GSLOG_DEBUG, "Creating quad am demodulator");
+        gslogd("Creating quad am demodulator");
         return QuadAmDemod::create(cudaDevice, cudaStream, mFactories);
 
       case Modulation_Fm: {
         const float gain = getQuadDemodGain(rfSampleRate, fskDeviation);
-        gslog(GSLOG_DEBUG,
-              "Creating quad fm demodulator. Sample rate [%f] Deviation [%f] Gain [%f]",
-              rfSampleRate,
-              fskDeviation,
-              gain);
+        gslogd(
+            "Creating quad fm demodulator. Sample rate [%f] Deviation [%f] Gain [%f]",
+            rfSampleRate,
+            fskDeviation,
+            gain);
 
         return QuadFmDemod::create(gain, cudaDevice, cudaStream, mFactories);
       }
 
       default:
-        gslog(GSLOG_ERROR, "Modulation [%d] is not supported", modulation);
+        gsloge("Modulation [%d] is not supported", modulation);
         return ERR_RESULT(Status_InvalidArgument);
     }
   }

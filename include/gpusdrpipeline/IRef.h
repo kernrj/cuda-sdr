@@ -116,7 +116,7 @@ class Ref final {
     ref.mReffed.store(nullptr);
   }
 
-  explicit Ref(const ImmutableRef<T>& other) noexcept
+  Ref(const ImmutableRef<T>& other) noexcept
     : mReffed(nullptr) {
     reset(other);
   }
@@ -231,7 +231,9 @@ class RefCt final {
 
   ~RefCt() = default;
 
-  void ref() const noexcept { mRefCount.fetch_add(1); }
+  void ref() const noexcept {
+    mRefCount.fetch_add(1);
+  }
 
   void unref() const noexcept {
     size_t previousRefCount;

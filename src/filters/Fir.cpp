@@ -23,13 +23,14 @@
 
 #include "Factories.h"
 #include "GSErrors.h"
+#include "GSLog.h"
 #include "util/CudaDevicePushPop.h"
 
 using namespace std;
 
 const size_t Fir::mAlignment = 32;
 
-static size_t getElementSize(SampleType sampleType) {
+static size_t getSampleSize(SampleType sampleType) {
   switch (sampleType) {
     case SampleType_Float:
       return sizeof(float);
@@ -52,19 +53,20 @@ Result<Filter> Fir::create(
     cudaStream_t cudaStream,
     IFactories* factories) noexcept {
   Ref<IAllocator> allocator;
+  Ref<IBufferCopier> deviceToDeviceBufferCopier;
+  Ref<IBufferCopier> hostToDeviceBufferCopier;
+  Ref<IRelocatableResizableBufferFactory> relocatableBufferFactory;
+  Ref<IMemSet> memSet;
+
   UNWRAP_OR_FWD_RESULT(
       allocator,
       factories->getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, mAlignment, false));
-
-  Ref<IBufferCopier> deviceToDeviceBufferCopier;
   UNWRAP_OR_FWD_RESULT(
       deviceToDeviceBufferCopier,
       factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToDevice));
-
-  Ref<IRelocatableResizableBufferFactory> relocatableBufferFactory;
-  auto bufferSliceFactory = factories->getBufferSliceFactory();
-  Ref<IMemSet> memSet;
-
+  UNWRAP_OR_FWD_RESULT(
+      hostToDeviceBufferCopier,
+      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyHostToDevice));
   UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
   UNWRAP_OR_FWD_RESULT(
       relocatableBufferFactory,
@@ -77,8 +79,9 @@ Result<Filter> Fir::create(
           cudaDevice,
           cudaStream,
           allocator.get(),
+          hostToDeviceBufferCopier.get(),
           relocatableBufferFactory.get(),
-          bufferSliceFactory,
+          factories->getBufferSliceFactory(),
           memSet.get());
   NON_NULL_OR_RET(fir);
 
@@ -98,6 +101,7 @@ Fir::Fir(
     int32_t cudaDevice,
     cudaStream_t cudaStream,
     IAllocator* allocator,
+    IBufferCopier* hostToDeviceBufferCopier,
     IRelocatableResizableBufferFactory* relocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory,
     IMemSet* memSet) noexcept
@@ -105,11 +109,12 @@ Fir::Fir(
       mTapType(tapType),
       mElementType(elementType),
       mAllocator(allocator),
+      mHostToDeviceBufferCopier(hostToDeviceBufferCopier),
       mDecimation(max(static_cast<size_t>(1), decimation)),
       mTapCount(0),
       mCudaStream(cudaStream),
       mCudaDevice(cudaDevice),
-      mElementSize(getElementSize(elementType)) {}
+      mElementSize(getSampleSize(elementType)) {}
 
 Status Fir::setTaps(const float* tapsReversed, size_t tapCount) noexcept {
   CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCudaDevice);
@@ -118,8 +123,8 @@ Status Fir::setTaps(const float* tapsReversed, size_t tapCount) noexcept {
     UNWRAP_OR_FWD_STATUS(mTaps, mAllocator->allocate(tapCount * sizeof(float)));
   }
 
-  SAFE_CUDA_OR_RET_STATUS(
-      cudaMemcpyAsync(mTaps.get(), tapsReversed, tapCount * sizeof(float), cudaMemcpyHostToDevice, mCudaStream));
+  const size_t bufferLength = tapCount * getSampleSize(mTapType);
+  FWD_IF_ERR(mHostToDeviceBufferCopier->copy(mTaps->data(), tapsReversed, bufferLength));
 
   mTapCount = static_cast<int32_t>(tapCount);
 
@@ -176,6 +181,10 @@ size_t Fir::getNumOutputElements() const noexcept {
 
 size_t Fir::getNumInputElements() const noexcept {
   Ref<const IBuffer> inputBuffer;
+  if (!inputPortsInitialized()) {
+    return 0;
+  }
+
   UNWRAP_OR_RETURN(inputBuffer, getPortInputBuffer(0), 0);
   return inputBuffer->range()->used() / mElementSize;
 }
@@ -194,6 +203,7 @@ size_t Fir::getOutputSizeAlignment(size_t port) noexcept {
 Status Fir::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
   GS_REQUIRE_OR_RET_STATUS(portCount != 0, "Must have one output port");
 
+  IBuffer* outputBuffer = portOutputBuffers[0];
   Ref<const IBuffer> inputBuffer;
   UNWRAP_OR_FWD_STATUS(inputBuffer, getPortInputBuffer(0));
 
@@ -201,14 +211,9 @@ Status Fir::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
     return Status_Success;
   }
 
-  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCudaDevice);
-
-  const auto& outputBuffer = portOutputBuffers[0];
-
   const size_t maxOutputsInOutputBuffer = outputBuffer->range()->remaining() / mElementSize;
   const size_t availableNumOutputs = getNumOutputElements();
   const size_t numOutputs = min(availableNumOutputs, maxOutputsInOutputBuffer);
-  const size_t numBlocks = (numOutputs + 31) / 32;
 
   if (numOutputs == 0) {
     return Status_Success;
@@ -295,3 +300,5 @@ Status Fir::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
    * Or, have 13, discard 9
    */
 }
+
+size_t Fir::preferredInputBufferSize(size_t port) noexcept { return 1 << 20; }

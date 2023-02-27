@@ -30,9 +30,10 @@ const size_t MultiplyCcc::mAlignment = 32;
 Result<Filter> MultiplyCcc::create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
-  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
 
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
       factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
@@ -51,7 +52,7 @@ MultiplyCcc::MultiplyCcc(
     IRelocatableResizableBufferFactory* relocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory,
     IMemSet* memSet) noexcept
-    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 2, memSet),
       mCudaDevice(cudaDevice),
       mCudaStream(cudaStream) {}
 
@@ -61,6 +62,10 @@ size_t MultiplyCcc::getOutputDataSize(size_t port) noexcept {
 }
 
 size_t MultiplyCcc::getAvailableNumInputElements() const {
+  if (!inputPortsInitialized()) {
+    return 0;
+  }
+
   Ref<const IBuffer> inputBuffer0;
   UNWRAP_OR_RETURN(inputBuffer0, getPortInputBuffer(0), 0);
   Ref<const IBuffer> inputBuffer1;
@@ -79,7 +84,11 @@ size_t MultiplyCcc::getOutputSizeAlignment(size_t port) noexcept {
 }
 
 size_t MultiplyCcc::preferredInputBufferSize(size_t port) noexcept {
-  GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
+  GS_REQUIRE_OR_RET_FMT(port <= 1, 0, "Output port [%zu] is out of range", port);
+
+  if (!inputPortsInitialized()) {
+    return 8192 * sizeof(cuComplex);
+  }
 
   Ref<const IBuffer> inputBuffer0;
   UNWRAP_OR_RETURN(inputBuffer0, getPortInputBuffer(0), 0);
@@ -89,6 +98,8 @@ size_t MultiplyCcc::preferredInputBufferSize(size_t port) noexcept {
   const auto range0 = inputBuffer0->range();
   const auto range1 = inputBuffer1->range();
 
+  constexpr size_t maxSize = 100 << 20;
+
   if (range0->used() == 0 && range1->used() == 0) {
     return 8192 * sizeof(cuComplex);
   } else if (range0->used() >= range1->used()) {
@@ -96,14 +107,14 @@ size_t MultiplyCcc::preferredInputBufferSize(size_t port) noexcept {
       case 0:
         return 0;
       case 1:
-        return range0->used() - range1->used();
+        return min(maxSize, range0->used() - range1->used());
       default:
         GS_FAIL("Cannot get preferred input buffer size. Unknown port [" << port << "]");
     }
   } else {
     switch (port) {
       case 0:
-        return range1->used() - range0->used();
+        return min(maxSize, range1->used() - range0->used());
       case 1:
         return 0;
       default:

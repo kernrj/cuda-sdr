@@ -21,7 +21,7 @@
 
 class ISteppingDriver : public IDriver {
  public:
-  virtual Status doFilter() noexcept = 0;
+  [[nodiscard]] virtual Status doFilter() noexcept = 0;
 
   ABSTRACT_IREF(ISteppingDriver);
 };

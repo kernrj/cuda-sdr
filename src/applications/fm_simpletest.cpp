@@ -99,9 +99,9 @@ static constexpr bool useFileInput = false;
 
 static void cleanupThings() {
   if (runAtExit.empty()) {
-    gslog(GSLOG_INFO, "Nothing to clean up");
+    gslogi("Nothing to clean up");
   } else {
-    gslog(GSLOG_INFO, "Cleaning up...");
+    gslogi("Cleaning up...");
   }
 
   while (!runAtExit.empty()) {
@@ -113,7 +113,7 @@ static void cleanupThings() {
 }
 
 static void exitSigHandler(int signum) {
-  gslog(GSLOG_INFO, "Caught signal %d, cleaning up.", signum);
+  gslogi("Caught signal %d, cleaning up.", signum);
   cleanupThings();
 
   if (signum == SIGINT || signum == SIGTERM) {
@@ -272,23 +272,20 @@ class NbfmTest {
         audioFileWriter(unwrap(
             factories->getAacFileWriterFactory()
                 ->createAacFileWriter(outputAudioFile, audioSampleRate, outputAudioBitRate, cudaDevice, cudaStream))) {
-    gslog(GSLOG_INFO, "Input file [%s]", inputFileName);
-    gslog(
-        GSLOG_INFO,
+    gslogi("Input file [%s]", inputFileName);
+    gslogi(
         "Output file [%s] sample rate [%zu] bit rate [%d]",
         outputAudioFile,
         audioSampleRate,
         outputAudioBitRate);
-    gslog(GSLOG_INFO, "CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
-    gslog(
-        GSLOG_INFO,
+    gslogi("CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
+    gslogi(
         "Channel frequency [%f], center frequency [%f] channel width [%f]",
         channelFrequency,
         centerFrequency,
         channelWidth);
-    gslog(GSLOG_INFO, "RF sample rate [%zu]", rfSampleRate);
-    gslog(
-        GSLOG_INFO,
+    gslogi("RF sample rate [%zu]", rfSampleRate);
+    gslogi(
         "RF Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]",
         rfLowPassCutoffFrequency,
         rfLowPassTransitionWidth,
@@ -296,16 +293,15 @@ class NbfmTest {
         rfLowPassDecimation,
         mRfLowPassTaps.size());
 
-    gslog(
-        GSLOG_INFO,
+    gslogi(
         "Audio Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]",
         audioLowPassCutoffFrequency,
         audioLowPassTransitionWidth,
         audioLowPassDbAttenuation,
         audioLowPassDecimation,
         mAudioLowPassTaps.size());
-    gslog(GSLOG_INFO, "Cosine source frequency [%f]", centerFrequency - channelFrequency);
-    gslog(GSLOG_INFO, "Quad demod gain [%f]", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
+    gslogi("Cosine source frequency [%f]", centerFrequency - channelFrequency);
+    gslogi("Quad demod gain [%f]", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
   }
 
   void start() {
@@ -316,11 +312,11 @@ class NbfmTest {
 
   void stop() {
     if (!useFileInput) {
-      gslog(GSLOG_INFO, "stop() - live");
+      gslogi("stop() - live");
       hackrfSource->stop();
       hackrfSource->releaseDevice();
     } else {
-      gslog(GSLOG_INFO, "stop() - file");
+      gslogi("stop() - file");
     }
   }
 
@@ -344,7 +340,7 @@ class NbfmTest {
     const size_t lowPassTapCount = mRfLowPassTaps.size();
     const size_t lowPassBufferSize = lowPassTapCount * sizeof(float);
     const auto gpuRfLowPassTaps = unwrap(cudaAllocator->allocate(lowPassBufferSize));
-    hostToDeviceMemcpy->copy(gpuRfLowPassTaps.get(), mRfLowPassTaps.data(), lowPassBufferSize);
+    THROW_IF_ERR(hostToDeviceMemcpy->copy(gpuRfLowPassTaps->data(), mRfLowPassTaps.data(), lowPassBufferSize));
 
     while (wroteSampleCount < stopAfterOutputSampleCount) {
       Source* gpuFloatSource = nullptr;
@@ -353,10 +349,10 @@ class NbfmTest {
         ConstRef<IBuffer> samples = unwrap(hostToDevice->requestBuffer(0, floatQuadReader->getAlignedOutputDataSize(0)));
 
         outputBuffers[0] = samples;
-        floatQuadReader->readOutput(outputBuffers.data(), 1);
-        hostToDevice->commitBuffer(0, samples->range()->used());
+        THROW_IF_ERR(floatQuadReader->readOutput(outputBuffers.data(), 1));
+        THROW_IF_ERR(hostToDevice->commitBuffer(0, samples->range()->used()));
 
-        gslog(GSLOG_INFO, "Read [%zu] bytes from [%s]", samples->range()->used(), inputFileName);
+        gslogi("Read [%zu] bytes from [%s]", samples->range()->used(), inputFileName);
         if (samples->range()->used() == 0) {
           return Status_Success;
         }
@@ -369,22 +365,22 @@ class NbfmTest {
         ConstRef<IBuffer> hackrfHostSamples = unwrap(hostToDevice->requestBuffer(0, hackrfBufferLength));
 
         outputBuffers[0] = hackrfHostSamples;
-        hackrfSource->readOutput(outputBuffers.data(), 1);
-        hostToDevice->commitBuffer(0, hackrfHostSamples->range()->used());
+        THROW_IF_ERR(hackrfSource->readOutput(outputBuffers.data(), 1));
+        THROW_IF_ERR(hostToDevice->commitBuffer(0, hackrfHostSamples->range()->used()));
 
-        gslog(GSLOG_INFO, "Read [%zu] bytes from HackRF", hackrfHostSamples->range()->used());
+        gslogi("Read [%zu] bytes from HackRF", hackrfHostSamples->range()->used());
 
         ConstRef<IBuffer> s8ToFloatInputCudaBuffer =
             unwrap(convertHackrfInputToFloat->requestBuffer(0, hostToDevice->getAlignedOutputDataSize(0)));
         outputBuffers[0] = s8ToFloatInputCudaBuffer;
-        hostToDevice->readOutput(outputBuffers.data(), 1);
+        THROW_IF_ERR(hostToDevice->readOutput(outputBuffers.data(), 1));
 
-        gslog(GSLOG_INFO, "Read [%zu] bytes from Int8->Float", s8ToFloatInputCudaBuffer->range()->used());
+        gslogi("Read [%zu] bytes from Int8->Float", s8ToFloatInputCudaBuffer->range()->used());
 
-        convertHackrfInputToFloat->commitBuffer(0, s8ToFloatInputCudaBuffer->range()->used());
+        THROW_IF_ERR(convertHackrfInputToFloat->commitBuffer(0, s8ToFloatInputCudaBuffer->range()->used()));
         gpuFloatSource = convertHackrfInputToFloat.get();
 
-        gslog(
+        gslogi(
             GSLOG_INFO,
             "Available [%zu] [%zu]",
             convertHackrfInputToFloat->getOutputDataSize(0),
@@ -398,10 +394,10 @@ class NbfmTest {
 
       size_t alignedSourceBufferSize = gpuFloatSource->getAlignedOutputDataSize(0);
 
-      gslog(GSLOG_INFO, "%zu %zu %zu", rfDataSize, inputSampleCount, alignedSourceBufferSize);
-      rfOutputBuffer->ensureMinSize(alignedSourceBufferSize);
+      gslogi("%zu %zu %zu", rfDataSize, inputSampleCount, alignedSourceBufferSize);
+      THROW_IF_ERR(rfOutputBuffer->ensureMinSize(alignedSourceBufferSize));
       outputBuffers[0] = rfOutputBuffer;
-      gpuFloatSource->readOutput(outputBuffers.data(), 1);
+      THROW_IF_ERR(gpuFloatSource->readOutput(outputBuffers.data(), 1));
 
       if (inputSampleCount / rfLowPassDecimation <= 1) {
         continue;  // need two low-pass outputs to demodulate one FM sample.
@@ -412,8 +408,7 @@ class NbfmTest {
 
       ConstRef<IBuffer> audioLowPassBuffer = unwrap(audioLowPassFilter->requestBuffer(0, fmDemodOutputCount));
 
-      gslog(
-          GSLOG_INFO,
+      gslogi(
           "%p %p %p %p",
           gpuRfLowPassTaps.get(),
           rfOutputBuffer->readPtr<cuComplex>(),
@@ -435,27 +430,29 @@ class NbfmTest {
           cudaDevice,
           cudaStream));
 
-      rfOutputBuffer->relocateUsedToStart();
+      THROW_IF_ERR(rfOutputBuffer->relocateUsedToStart());
 
-      audioLowPassFilter->commitBuffer(0, fmDemodOutputCount);
+      THROW_IF_ERR(audioLowPassFilter->commitBuffer(0, fmDemodOutputCount));
 
       ConstRef<IBuffer> deviceToHostBuffer =
           unwrap(deviceToHost->requestBuffer(0, audioLowPassFilter->getAlignedOutputDataSize(0)));
       outputBuffers[0] = deviceToHostBuffer;
-      audioLowPassFilter->readOutput(outputBuffers.data(), 1);
-      deviceToHost->commitBuffer(0, deviceToHostBuffer->range()->used());
+      THROW_IF_ERR(audioLowPassFilter->readOutput(outputBuffers.data(), 1));
+      THROW_IF_ERR(deviceToHost->commitBuffer(0, deviceToHostBuffer->range()->used()));
 
       ConstRef<IBuffer> audioEncMuxInputBuffer =
           unwrap(audioFileWriter->requestBuffer(0, deviceToHost->getAlignedOutputDataSize(0)));
 
       outputBuffers[0] = audioEncMuxInputBuffer;
-      deviceToHost->readOutput(outputBuffers.data(), 1);
+      THROW_IF_ERR(deviceToHost->readOutput(outputBuffers.data(), 1));
 
       cudaStreamSynchronize(cudaStream);
 
       wroteSampleCount += audioEncMuxInputBuffer->range()->used() / sizeof(float);
-      audioFileWriter->commitBuffer(0, audioEncMuxInputBuffer->range()->used());
+      THROW_IF_ERR(audioFileWriter->commitBuffer(0, audioEncMuxInputBuffer->range()->used()));
     }
+
+    return Status_Success;
   }
 
  private:
@@ -553,18 +550,18 @@ int main(int argc, char** argv) {
     nbfmTest->start();
     nbfmTest->doFilter(stopAfterOutputAudioSampleCount);
   } catch (exception& e) {
-    gslog(GSLOG_ERROR, "Exception: %s", e.what());
+    gsloge("Exception: %s", e.what());
     nbfmTest->stop();
     nbfmTest.reset();
-    gslog(GSLOG_ERROR, "Done cleaning up");
+    gsloge("Done cleaning up");
 
     return -1;
   } catch (...) {
-    gslog(GSLOG_ERROR, "Unknown error");
+    gsloge("Unknown error");
     cleanupThings();
     nbfmTest->stop();
     nbfmTest.reset();
-    gslog(GSLOG_ERROR, "Done cleaning up");
+    gsloge("Done cleaning up");
 
     return -1;
   }

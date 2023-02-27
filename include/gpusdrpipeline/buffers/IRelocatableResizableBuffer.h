@@ -22,7 +22,7 @@
 
 class IRelocatableResizableBuffer : public IRelocatable, public IResizableBuffer {
  public:
-  Status relocateUsedToStart() noexcept { return relocate(0, range()->offset(), range()->used()); }
+  [[nodiscard]] Status relocateUsedToStart() noexcept { return relocate(0, range()->offset(), range()->used()); }
 
   ABSTRACT_IREF(IRelocatableResizableBuffer);
 };

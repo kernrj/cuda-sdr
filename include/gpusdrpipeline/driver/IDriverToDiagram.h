@@ -31,7 +31,7 @@ class IDriverToDiagram : public virtual IRef {
    * @param diagramSize The size of the diagramBuffer.
    * @return The number of bytes the full diagram string occupies, not including any null-terminator value.
    */
-  virtual Result<size_t> convertToDot(
+  [[nodiscard]] virtual Result<size_t> convertToDot(
       IDriver* driver,
       const char* name,
       char* diagramBuffer,

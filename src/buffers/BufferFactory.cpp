@@ -31,12 +31,8 @@ Result<IBuffer> BufferFactory::createBuffer(size_t size) noexcept {
     return ERR_RESULT(Status_OutOfMemory);
   }
 
-  Ref<IBuffer> buffer;
+  IBuffer* buffer;
   UNWRAP_OR_FWD_RESULT(buffer, OwnedBuffer::create(0, 0, data, mBufferRangeFactory));
-
-  if (buffer == nullptr) {
-    return ERR_RESULT(Status_OutOfMemory);
-  }
 
   return makeRefResultNonNull<IBuffer>(buffer);
 }

@@ -28,7 +28,7 @@ using namespace std;
     int hackrfStatus = (hackrfCmd__);                                                     \
     if (hackrfStatus != HACKRF_SUCCESS) {                                                 \
       const char* errorName = hackrf_error_name(static_cast<hackrf_error>(hackrfStatus)); \
-      gslog(GSLOG_ERROR, "%s - Error %s (%d)", errorMsg__, errorName, hackrfStatus);      \
+      gsloge("%s - Error %s (%d)", errorMsg__, errorName, hackrfStatus);      \
       return Status_RuntimeError;                                                         \
     }                                                                                     \
   } while (false)
@@ -113,13 +113,13 @@ Status HackrfSource::selectDeviceByIndex(int deviceIndex) noexcept {
   SAFERF(hackrf_device_list_open(deviceList.get(), deviceIndex, &deviceRaw), "Error opening HackRF device");
 
   mHackrfDevice = shared_ptr<hackrf_device>(deviceRaw, [](hackrf_device* device) {
-    gslog(GSLOG_INFO, "Closing HackRF device");
+    gslogi("Closing HackRF device");
     hackrf_close(device);
   });
 
   for (int i = 0; i < deviceList->devicecount; i++) {
     const char* sn = deviceList->serial_numbers[i];
-    gslog(GSLOG_INFO, "Device [%d] Serial No [%s]", i, sn);
+    gslogi("Device [%d] Serial No [%s]", i, sn);
   }
 
   return Status_Success;
@@ -169,7 +169,7 @@ int HackrfSource::rxCallbackWrapper(hackrf_transfer* transfer) noexcept {
 
 int HackrfSource::rxCallback(hackrf_transfer* transfer) noexcept CLEANUP_AND_ABORT_ON_EX(
     {
-      if (mBufferPool == nullptr || mBufferPool->getBufferSize() < transfer->valid_length) {
+      if (mBufferPool == nullptr || static_cast<int>(mBufferPool->getBufferSize()) < transfer->valid_length) {
         UNWRAP_OR_RETURN(mBufferPool, mBufferPoolFactory->createBufferPool(transfer->valid_length), 0);
       }
 
@@ -177,7 +177,7 @@ int HackrfSource::rxCallback(hackrf_transfer* transfer) noexcept CLEANUP_AND_ABO
       UNWRAP_OR_RETURN(buffer, mBufferPool->tryGetBuffer(), 0);
 
       if (buffer == nullptr) {
-        gslog(GSLOG_INFO, "HackrfSource buffer underrun");
+        gslogi("HackrfSource buffer underrun");
         return 0;
       }
 
@@ -257,13 +257,13 @@ Status HackrfSource::readOutput(IBuffer** portOutputBuffers, size_t portCount) n
 
 Status HackrfSource::start() noexcept {
   if (mStarted) {
-    gslog(GSLOG_WARN, "HackRF is already started. Ignoring extra call to start()");
+    gslogw("HackRF is already started. Ignoring extra call to start()");
     return Status_InvalidState;
   }
 
   GS_REQUIRE_OR_RET_STATUS(mHackrfDevice != nullptr, "Select a device before starting HackrfSource");
 
-  gslog(GSLOG_DEBUG, "Starting HackRF device");
+  gslogd("Starting HackRF device");
 
   SAFERF(hackrf_set_freq(mHackrfDevice.get(), mFrequency), "Error setting frequency");
   SAFERF(hackrf_set_sample_rate(mHackrfDevice.get(), mSampleRate), "Error setting sample rate");
@@ -272,21 +272,21 @@ Status HackrfSource::start() noexcept {
 
   mStarted = true;
 
-  gslog(GSLOG_DEBUG, "Started HackRF device");
+  gslogd("Started HackRF device");
 
   return Status_Success;
 }
 
 Status HackrfSource::stop() noexcept {
   if (!mStarted) {
-    gslog(GSLOG_WARN, "HackRF is already stopped. Ignoring extra call to stop()");
+    gslogw("HackRF is already stopped. Ignoring extra call to stop()");
     return Status_InvalidState;
   }
 
   mHackrfDevice.reset();
   mStarted = false;
 
-  gslog(GSLOG_DEBUG, "Stopped HackRF device");
+  gslogd("Stopped HackRF device");
   cout << "Stopped Hack RF device" << endl;
 
   return Status_Success;

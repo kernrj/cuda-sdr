@@ -173,7 +173,13 @@ class Factories final : public IFactories {
   ConstRef<IReadByteCountMonitorFactory> mReadByteCountMonitorFactory;
   ConstRef<IDriverToDiagramFactory> mDriverToDotFactory;
 
-  REF_COUNTED(Factories);
+  ~Factories() final = default;
+
+  /// No-op - Factories is a singleton
+  void ref() const noexcept final {}
+
+  /// No-op - Factories is a singleton
+  void unref() const noexcept final {}
 };
 
 Result<IFactories> getFactoriesSingleton() noexcept {

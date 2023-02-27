@@ -28,12 +28,12 @@ const string DriverToDot::kNodeNameNotFound = "NODE NOT IN GRAPH";
 static string createIndent(size_t indentSpaces) { return string(indentSpaces, ' '); }
 
 void DriverToDot::outputConnections(
-    IDriver* driver,
+    [[maybe_unused]] IDriver* driver,
     void* context,
     Source* source,
-    size_t sourcePort,
+    [[maybe_unused]] size_t sourcePort,
     Sink* sink,
-    size_t sinkPort) noexcept {
+    [[maybe_unused]] size_t sinkPort) noexcept {
   auto connectionCtx = reinterpret_cast<ConnectionCtx*>(context);
 
   const auto indentStr = createIndent(connectionCtx->rootIndent);
@@ -72,8 +72,8 @@ void DriverToDot::outputConnections(
 }
 
 void DriverToDot::outputNodeAttributes(
-    IDriver* driver,
-    Node* node,
+    [[maybe_unused]] IDriver* driver,
+    [[maybe_unused]] Node* node,
     void* context,
     const char* attrName,
     const char* attrVal) noexcept {
@@ -145,7 +145,7 @@ Result<size_t> DriverToDot::convertToDot(
   NON_NULL_OR_RET(name);
 
   if (diagramSize > 0 && diagramBuffer == nullptr) {
-    gslog(GSLOG_ERROR, "diagramBuffer must be set when diagramSize [%zu] > 0", diagramSize);
+    gsloge("diagramBuffer must be set when diagramSize [%zu] > 0", diagramSize);
     return ERR_RESULT(Status_InvalidArgument);
   }
 
@@ -189,7 +189,6 @@ Status DriverToDot::outputGraph(
   auto indentStr = createIndent(rootIndent + indentDelta);
 
   const char* graphType = isSubgraph ? "subgraph" : "digraph";
-  const char* namePrefix = isSubgraph ? "cluster" : "";
   self->mOutStream << rootIndentStr << graphType << " \"" << self->getOrCreateClusterId(driver) << "\" {" << endl;
 
   if (!label.empty()) {
@@ -240,7 +239,7 @@ Status DriverToDot::outputGraph(
           .self = self,
       };
 
-      subDriver.driver->iterateOverConnections(&ctx, outputConnections);
+      subDriver.driver->iterateOverConnections(&subDriverCtx, outputConnections);
     }
   }
 
@@ -305,7 +304,7 @@ std::string DriverToDot::getOrCreateIdForConnections(Node* node) {
   return getOrCreateBaseNodeId(node);
 }
 
-void DriverToDot::getDriversRecursivelyCallback(IDriver* driver, void* context, Node* node) noexcept {
+void DriverToDot::getDriversRecursivelyCallback([[maybe_unused]] IDriver* driver, void* context, Node* node) noexcept {
   if (node->asDriver() == nullptr) {
     return;
   }

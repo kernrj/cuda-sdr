@@ -23,6 +23,7 @@ add_executable(
     SteppingDriverTest.cpp
 )
 
+proj_set_default_warning_flags(${TEST_TARGET_NAME} PRIVATE)
 #set_target_properties(${TEST_PROJECT_NAME} PROPERTIES CUDA_ARCHITECTURES "${PROJ_CUDA_ARCHITECTURES}")
 
 set(GENERATED_HEADER_DIR "${CMAKE_BINARY_DIR}/include")

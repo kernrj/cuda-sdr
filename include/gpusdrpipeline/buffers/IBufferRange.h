@@ -62,7 +62,7 @@ class IBufferRange : public virtual IRef {
     const size_t newStartOffset = offset() + increaseBy;
     const size_t currentEndOffset = endOffset();
     if (newStartOffset > currentEndOffset) {
-      gslog(GSLOG_ERROR, "New start offset [%zu] exceeds the end offset [%zu]", newStartOffset, currentEndOffset);
+      gsloge("New start offset [%zu] exceeds the end offset [%zu]", newStartOffset, currentEndOffset);
       return Status_InvalidArgument;
     }
 
@@ -73,7 +73,7 @@ class IBufferRange : public virtual IRef {
     const size_t newEndOffset = endOffset() + increaseBy;
     const size_t currentCapacity = capacity();
     if (newEndOffset > capacity()) {
-      gslog(GSLOG_ERROR, "New end offset [%zu] exceeds the capacity [%zu]", newEndOffset, currentCapacity);
+      gsloge("New end offset [%zu] exceeds the capacity [%zu]", newEndOffset, currentCapacity);
       return Status_InvalidArgument;
     }
 

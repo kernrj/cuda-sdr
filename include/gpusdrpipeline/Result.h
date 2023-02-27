@@ -104,7 +104,7 @@ T unwrap(ValResult<T>&& result) {
   do {                                                                                       \
     auto result__ = unwrapCmd__;                                                             \
     if (result__.status != Status_Success) {                                                 \
-      gslog(GSLOG_ERROR, "Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
+      gsloge("Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
       return {                                                                               \
           .status = result__.status,                                                         \
           .value = {},                                                                       \
@@ -118,7 +118,7 @@ T unwrap(ValResult<T>&& result) {
   do {                                                                         \
     const Status status__ = cmdReturningStatus__;                              \
     if (status__ != Status_Success) {                                          \
-      gslog(GSLOG_ERROR, "Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
+      gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
     }                                                                          \
   } while (false)
 
@@ -127,7 +127,7 @@ T unwrap(ValResult<T>&& result) {
   do {                                                                         \
     const Status status__ = cmdReturningStatus__;                              \
     if (status__ != Status_Success) {                                          \
-      gslog(GSLOG_ERROR, "Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
+      gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
       return status__;                                                         \
     }                                                                          \
   } while (false)
@@ -136,7 +136,7 @@ T unwrap(ValResult<T>&& result) {
   do {                                                                         \
     const Status status__ = cmdReturningStatus__;                              \
     if (status__ != Status_Success) {                                          \
-      gslog(GSLOG_ERROR, "Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
+      gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
       throwIfError(status__);                                                  \
     }                                                                          \
   } while (false)
@@ -145,7 +145,7 @@ T unwrap(ValResult<T>&& result) {
   do {                                                                         \
     const Status status__ = cmdReturningStatus__;                              \
     if (status__ != Status_Success) {                                          \
-      gslog(GSLOG_ERROR, "Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
+      gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
       return returnValueOnErr__;                                               \
     }                                                                          \
   } while (false)
@@ -154,7 +154,7 @@ T unwrap(ValResult<T>&& result) {
   do {                                                                         \
     const Status status__ = cmdReturningStatus__;                              \
     if (status__ != Status_Success) {                                          \
-      gslog(GSLOG_ERROR, "Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
+      gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
       return {.status = status__, .value = {}};                                \
     }                                                                          \
   } while (false)
@@ -163,7 +163,7 @@ T unwrap(ValResult<T>&& result) {
   do {                                                                                       \
     auto result__ = unwrapCmd__;                                                             \
     if (result__.status != Status_Success) {                                                 \
-      gslog(GSLOG_ERROR, "Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
+      gsloge("Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
       return result__.status;                                                                \
     }                                                                                        \
                                                                                              \
@@ -187,7 +187,7 @@ inline bool printIfError(Result<T>&& result, GS_FMT_STR(const char* fmt), ...) n
   do {                                                                                                             \
     auto result__ = unwrapCmd__;                                                                                   \
     if (result__.status != Status_Success) {                                                                       \
-      gslog(GSLOG_ERROR, "Error [%d] in result [%s] at %s:%d", result__.status, #unwrapCmd__, __FILE__, __LINE__); \
+      gsloge("Error [%d] in result [%s] at %s:%d", result__.status, #unwrapCmd__, __FILE__, __LINE__); \
       return retOnError__;                                                                                         \
     }                                                                                                              \
     assignValueToVar__ = result__.value;                                                                           \
@@ -197,7 +197,7 @@ inline bool printIfError(Result<T>&& result, GS_FMT_STR(const char* fmt), ...) n
   do {                                                                                       \
     auto result__ = unwrapCmd__;                                                             \
     if (result__.status != Status_Success) {                                                 \
-      gslog(GSLOG_ERROR, "Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
+      gsloge("Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
       return {                                                                               \
           .status = result__.status,                                                         \
           .value = {},                                                                       \
@@ -209,7 +209,7 @@ inline bool printIfError(Result<T>&& result, GS_FMT_STR(const char* fmt), ...) n
   do {                                                                                \
     auto ptrVar__ = ptr__;                                                            \
     if (ptrVar__ == nullptr) {                                                        \
-      gslog(GSLOG_ERROR, "%s cannot be null - at %s:%d", #ptr__, __FILE__, __LINE__); \
+      gsloge("%s cannot be null - at %s:%d", #ptr__, __FILE__, __LINE__); \
       return ERR_RESULT(Status_OutOfMemory);                                          \
     }                                                                                 \
   } while (false)
@@ -218,7 +218,7 @@ inline bool printIfError(Result<T>&& result, GS_FMT_STR(const char* fmt), ...) n
   do {                                                                                \
     auto ptrVar__ = ptr__;                                                            \
     if (ptrVar__ == nullptr) {                                                        \
-      gslog(GSLOG_ERROR, "%s cannot be null - at %s:%d", #ptr__, __FILE__, __LINE__); \
+      gsloge("%s cannot be null - at %s:%d", #ptr__, __FILE__, __LINE__); \
       return ERR_RESULT(Status_InvalidArgument);                                      \
     }                                                                                 \
   } while (false)
@@ -227,7 +227,7 @@ inline bool printIfError(Result<T>&& result, GS_FMT_STR(const char* fmt), ...) n
   do {                                                                                \
     auto ptrVal__ = ptr__;                                                            \
     if (ptrVar__ == nullptr) {                                                        \
-      gslog(GSLOG_ERROR, "%s cannot be null - at %s:%d", #ptr__, __FILE__, __LINE__); \
+      gsloge("%s cannot be null - at %s:%d", #ptr__, __FILE__, __LINE__); \
       return ERR_RESULT(Status_OutOfMemory);                                          \
     }                                                                                 \
                                                                                       \

@@ -31,12 +31,13 @@ Result<Filter> AddConst::create(
     IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
-  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
 
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
       factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
 
   return makeRefResultNonNull<Filter>(new (nothrow) AddConst(
       addValueToMagnitude,
@@ -78,7 +79,7 @@ size_t AddConst::getOutputSizeAlignment(size_t port) noexcept {
 
 Status AddConst::readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept {
   if (numPorts == 0) {
-    gslog(GSLOG_ERROR, "One output port is required");
+    gsloge("One output port is required");
     return Status_InvalidArgument;
   }
 
@@ -104,3 +105,5 @@ Status AddConst::readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexce
 
   return Status_Success;
 }
+
+size_t AddConst::preferredInputBufferSize(size_t port) noexcept { return 1 << 20; }

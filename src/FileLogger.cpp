@@ -22,6 +22,18 @@
 #include <cstdio>
 #include <ctime>
 
+static const char* paddedLogLevelName(LogLevel logLevel) {
+  switch (logLevel) {
+    case GSLOG_TRACE: return "TRACE";
+    case GSLOG_DEBUG: return "DEBUG";
+    case GSLOG_INFO: return " INFO";
+    case GSLOG_WARN: return " WARN";
+    case GSLOG_ERROR: return "ERROR";
+    case GSLOG_FATAL: return "FATAL";
+    default: return "?????";
+  }
+}
+
 FileLogger::FileLogger(FILE* file, bool closeWhenDone) noexcept
     : mFile(file),
       mCloseWhenDone(closeWhenDone) {}
@@ -34,7 +46,7 @@ FileLogger::~FileLogger() {
 
 void FileLogger::log(LogLevel logLevel, const char* msgFmt, va_list args) noexcept {
   if (mFile == nullptr) {
-    fprintf(stderr, "(NULL LOGGER) ");
+    fprintf(stderr, "(NULL LOGGER) - ");
     vfprintf(stderr, msgFmt, args);
     putc('\n', stderr);
     return;
@@ -59,7 +71,7 @@ void FileLogger::log(LogLevel logLevel, const char* msgFmt, va_list args) noexce
   static char timeStr[32];
   strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &nowTm);
   int64_t microseconds = now.tv_nsec / 1000;
-  fprintf(mFile, "%06" PRId64 " %s ", microseconds, gslogLevelName(logLevel));
+  fprintf(mFile, "%s.%06" PRId64 " - %s - ", timeStr, microseconds, paddedLogLevelName(logLevel));
   timeStr[sizeof(timeStr) - 1] = 0;
 
   vfprintf(mFile, msgFmt, args);

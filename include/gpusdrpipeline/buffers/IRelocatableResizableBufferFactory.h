@@ -21,7 +21,7 @@
 
 class IRelocatableResizableBufferFactory : public virtual IRef {
  public:
-  virtual Result<IRelocatableResizableBuffer> createRelocatableBuffer(size_t size) const noexcept = 0;
+  [[nodiscard]] virtual Result<IRelocatableResizableBuffer> createRelocatableBuffer(size_t size) const noexcept = 0;
 
   ABSTRACT_IREF(IRelocatableResizableBufferFactory);
 };

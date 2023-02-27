@@ -48,14 +48,14 @@ static void cleanupAtExit() {
   }
 
   sessionCount = 0;
-  gslog(GSLOG_INFO, "hackrf_exit() while exiting");
+  gslogi("hackrf_exit() while exiting");
   hackrf_exit();
 }
 
 static void incSessionRefCount() {
   lock_guard<mutex> lock(sessionLock);
   if (sessionCount == 0) {
-    gslog(GSLOG_INFO, "hackrf_init()");
+    gslogi("hackrf_init()");
 
     SAFE_HRF(hackrf_init(), "HackRF library initialization");
 
@@ -63,8 +63,7 @@ static void incSessionRefCount() {
       int status = std::atexit(cleanupAtExit);
 
       if (status != 0) {
-        gslog(
-            GSLOG_ERROR,
+        gsloge(
             "Failed to register HackRF clean-up. If the program terminates "
             "abnormally, the HackRF library will not be cleanly shutdown and "
             "the HackRF device may need to be reset.");
@@ -85,7 +84,7 @@ static void decSessionRefCount() {
   sessionCount--;
 
   if (sessionCount == 0) {
-    gslog(GSLOG_INFO, "hackrf_exit()");
+    gslogi("hackrf_exit()");
     hackrf_exit();
   }
 }

@@ -34,12 +34,13 @@ Result<Filter> QuadFmDemod::create(
     IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
-  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
 
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
       factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, 32, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
 
   return makeRefResultNonNull<Filter>(new (nothrow) QuadFmDemod(
       gain,
@@ -105,3 +106,5 @@ Status QuadFmDemod::readOutput(IBuffer** portOutputBuffers, size_t portCount) no
 
   return Status_Success;
 }
+
+size_t QuadFmDemod::preferredInputBufferSize(size_t port) noexcept { return 1 << 20; }

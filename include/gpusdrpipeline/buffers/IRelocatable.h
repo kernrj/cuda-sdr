@@ -21,7 +21,7 @@
 
 class IRelocatable : public virtual IRef {
  public:
-  virtual Status relocate(size_t dstOffset, size_t srcOffset, size_t length) noexcept = 0;
+  [[nodiscard]] virtual Status relocate(size_t dstOffset, size_t srcOffset, size_t length) noexcept = 0;
 
   ABSTRACT_IREF(IRelocatable);
 };

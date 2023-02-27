@@ -38,55 +38,55 @@
 
 class IFactories : public virtual IRef {
  public:
-  virtual IResizableBufferFactory* getResizableBufferFactory() noexcept = 0;
-  virtual ICudaAllocatorFactory* getCudaAllocatorFactory() noexcept = 0;
-  virtual IBufferSliceFactory* getBufferSliceFactory() = 0;
-  virtual IAllocator* getSysMemAllocator() noexcept = 0;
-  virtual IBufferCopier* getSysMemCopier() noexcept = 0;
-  virtual ICudaBufferCopierFactory* getCudaBufferCopierFactory() noexcept = 0;
-  virtual IBufferUtil* getBufferUtil() noexcept = 0;
-  virtual ICudaMemcpyFilterFactory* getCudaMemcpyFilterFactory() noexcept = 0;
-  virtual IAacFileWriterFactory* getAacFileWriterFactory() noexcept = 0;
-  virtual IAddConstFactory* getAddConstFactory() noexcept = 0;
-  virtual IAddConstToVectorLengthFactory* getAddConstToVectorLengthFactory() noexcept = 0;
-  virtual ICosineSourceFactory* getCosineSourceFactory() noexcept = 0;
-  virtual IFileReaderFactory* getFileReaderFactory() noexcept = 0;
-  virtual IFirFactory* getFirFactory() noexcept = 0;
-  virtual IHackrfSourceFactory* getHackrfSourceFactory() noexcept = 0;
-  virtual ICudaFilterFactory* getInt8ToFloatFactory() noexcept = 0;
-  virtual ICudaFilterFactory* getMagnitudeFactory() noexcept = 0;
-  virtual ICudaFilterFactory* getMultiplyFactory() noexcept = 0;
-  virtual IQuadDemodFactory* getQuadDemodFactory() noexcept = 0;
-  virtual IMemSet* getSysMemSet() noexcept = 0;
-  virtual ICudaMemSetFactory* getCudaMemSetFactory() noexcept = 0;
-  virtual ISteppingDriverFactory* getSteppingDriverFactory() noexcept = 0;
-  virtual IFilterDriverFactory* getFilterDriverFactory() noexcept = 0;
-  virtual IPortRemappingSinkFactory* getPortRemappingSinkFactory() noexcept = 0;
-  virtual IRfToPcmAudioFactory* getRfToPcmAudioFactory() noexcept = 0;
-  virtual IReadByteCountMonitorFactory* getReadByteCountMonitorFactory() noexcept = 0;
-  virtual IDriverToDiagramFactory* getDriverToDotFactory() noexcept = 0;
-  virtual IBufferRangeFactory* getBufferRangeFactory() noexcept = 0;
+  [[nodiscard]] virtual IResizableBufferFactory* getResizableBufferFactory() noexcept = 0;
+  [[nodiscard]] virtual ICudaAllocatorFactory* getCudaAllocatorFactory() noexcept = 0;
+  [[nodiscard]] virtual IBufferSliceFactory* getBufferSliceFactory() = 0;
+  [[nodiscard]] virtual IAllocator* getSysMemAllocator() noexcept = 0;
+  [[nodiscard]] virtual IBufferCopier* getSysMemCopier() noexcept = 0;
+  [[nodiscard]] virtual ICudaBufferCopierFactory* getCudaBufferCopierFactory() noexcept = 0;
+  [[nodiscard]] virtual IBufferUtil* getBufferUtil() noexcept = 0;
+  [[nodiscard]] virtual ICudaMemcpyFilterFactory* getCudaMemcpyFilterFactory() noexcept = 0;
+  [[nodiscard]] virtual IAacFileWriterFactory* getAacFileWriterFactory() noexcept = 0;
+  [[nodiscard]] virtual IAddConstFactory* getAddConstFactory() noexcept = 0;
+  [[nodiscard]] virtual IAddConstToVectorLengthFactory* getAddConstToVectorLengthFactory() noexcept = 0;
+  [[nodiscard]] virtual ICosineSourceFactory* getCosineSourceFactory() noexcept = 0;
+  [[nodiscard]] virtual IFileReaderFactory* getFileReaderFactory() noexcept = 0;
+  [[nodiscard]] virtual IFirFactory* getFirFactory() noexcept = 0;
+  [[nodiscard]] virtual IHackrfSourceFactory* getHackrfSourceFactory() noexcept = 0;
+  [[nodiscard]] virtual ICudaFilterFactory* getInt8ToFloatFactory() noexcept = 0;
+  [[nodiscard]] virtual ICudaFilterFactory* getMagnitudeFactory() noexcept = 0;
+  [[nodiscard]] virtual ICudaFilterFactory* getMultiplyFactory() noexcept = 0;
+  [[nodiscard]] virtual IQuadDemodFactory* getQuadDemodFactory() noexcept = 0;
+  [[nodiscard]] virtual IMemSet* getSysMemSet() noexcept = 0;
+  [[nodiscard]] virtual ICudaMemSetFactory* getCudaMemSetFactory() noexcept = 0;
+  [[nodiscard]] virtual ISteppingDriverFactory* getSteppingDriverFactory() noexcept = 0;
+  [[nodiscard]] virtual IFilterDriverFactory* getFilterDriverFactory() noexcept = 0;
+  [[nodiscard]] virtual IPortRemappingSinkFactory* getPortRemappingSinkFactory() noexcept = 0;
+  [[nodiscard]] virtual IRfToPcmAudioFactory* getRfToPcmAudioFactory() noexcept = 0;
+  [[nodiscard]] virtual IReadByteCountMonitorFactory* getReadByteCountMonitorFactory() noexcept = 0;
+  [[nodiscard]] virtual IDriverToDiagramFactory* getDriverToDotFactory() noexcept = 0;
+  [[nodiscard]] virtual IBufferRangeFactory* getBufferRangeFactory() noexcept = 0;
 
-  virtual Result<IBufferFactory> createBufferFactory(IAllocator* allocator) noexcept = 0;
+  [[nodiscard]] virtual Result<IBufferFactory> createBufferFactory(IAllocator* allocator) noexcept = 0;
 
-  virtual Result<IRelocatableResizableBufferFactory> createRelocatableResizableBufferFactory(
+  [[nodiscard]] virtual Result<IRelocatableResizableBufferFactory> createRelocatableResizableBufferFactory(
       IAllocator* allocator,
       const IBufferCopier* bufferCopier) noexcept = 0;
 
-  virtual Result<IBufferPool> createBufferPool(
+  [[nodiscard]] virtual Result<IBufferPool> createBufferPool(
       size_t maxBufferCount,
       size_t bufferSize,
       IBufferFactory* bufferFactory) noexcept = 0;
 
-  virtual Result<IBufferPoolFactory> createBufferPoolFactory(
+  [[nodiscard]] virtual Result<IBufferPoolFactory> createBufferPoolFactory(
       size_t maxBufferCount,
       IBufferFactory* bufferFactory) noexcept = 0;
 
-  virtual Result<IRelocatableResizableBufferFactory> createRelocatableSysMemBufferFactory() noexcept {
+  [[nodiscard]] virtual Result<IRelocatableResizableBufferFactory> createRelocatableSysMemBufferFactory() noexcept {
     return createRelocatableResizableBufferFactory(getSysMemAllocator(), getSysMemCopier());
   }
 
-  virtual Result<IRelocatableResizableBufferFactory> createRelocatableCudaBufferFactory(
+  [[nodiscard]] virtual Result<IRelocatableResizableBufferFactory> createRelocatableCudaBufferFactory(
       int32_t cudaDevice,
       cudaStream_t cudaStream,
       size_t cudaAlignment,
@@ -105,13 +105,13 @@ class IFactories : public virtual IRef {
     return createRelocatableResizableBufferFactory(cudaAllocator.get(), cudaMemCopier.get());
   }
 
-  virtual Result<IBufferFactory> createSysMemBufferFactory() noexcept {
+  [[nodiscard]] virtual Result<IBufferFactory> createSysMemBufferFactory() noexcept {
     return createBufferFactory(getSysMemAllocator());
   }
 
   ABSTRACT_IREF(IFactories);
 };
 
-extern "C" Result<IFactories> getFactoriesSingleton() noexcept;
+GS_EXPORT [[nodiscard]] Result<IFactories> getFactoriesSingleton() noexcept;
 
 #endif  // GPUSDR_FACTORIES_H

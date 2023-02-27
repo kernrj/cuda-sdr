@@ -34,7 +34,7 @@ Result<Filter> CudaMemcpyFilter::create(
     IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
-  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
   Ref<IBufferCopier> cudaCopier;
 
@@ -45,6 +45,7 @@ Result<Filter> CudaMemcpyFilter::create(
           cudaStream,
           32,
           /*useHostMemory=*/isInputHostMemory(memcpyKind)));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
   UNWRAP_OR_FWD_RESULT(
       cudaCopier,
       factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, memcpyKind));
@@ -52,7 +53,7 @@ Result<Filter> CudaMemcpyFilter::create(
   return makeRefResultNonNull<Filter>(new (nothrow) CudaMemcpyFilter(
       relocatableCudaBufferFactory.get(),
       bufferSliceFactory.get(),
-      memSet,
+      memSet.get(),
       cudaCopier.get()));
 }
 
@@ -91,3 +92,5 @@ Status CudaMemcpyFilter::readOutput(IBuffer** portOutputBuffers, size_t portCoun
 
   return consumeInputBytesAndMoveUsedToStart(0, copyNumBytes);
 }
+
+size_t CudaMemcpyFilter::preferredInputBufferSize(size_t port) noexcept { return 1 << 20; }

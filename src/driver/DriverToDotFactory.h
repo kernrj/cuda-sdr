@@ -22,7 +22,7 @@
 
 class DriverToDotFactory final : public IDriverToDiagramFactory {
  public:
-  Result<IDriverToDiagram> create() const final {
+  [[nodiscard]] Result<IDriverToDiagram> create() const final {
     return makeRefResultNonNull<IDriverToDiagram>(new (std::nothrow) DriverToDot());
   }
 

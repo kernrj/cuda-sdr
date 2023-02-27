@@ -26,14 +26,32 @@ class IBufferSliceFactory : public virtual IRef {
    * Creates a buffer slice, and sets the start and end offsets of the buffer slice to the overlap of the start and end
    * offsets in bufferToSlice.
    */
-  virtual Result<IBuffer> slice(IBuffer* bufferToSlice, size_t sliceStartOffset, size_t sliceEndOffset) noexcept = 0;
+  [[nodiscard]] virtual Result<IBuffer> slice(
+      IBuffer* bufferToSlice,
+      size_t sliceStartOffset,
+      size_t sliceEndOffset) noexcept = 0;
 
   /**
    * Returns a buffer containing the unused portion of data at the end of another buffer.
    * The start and end offsets of the returned buffer are set to 0 (overlap with the original buffer is 0).
    */
-  Result<IBuffer> sliceRemaining(IBuffer* bufferToSlice) {
-    return slice(bufferToSlice, bufferToSlice->range()->endOffset(), bufferToSlice->range()->capacity());
+  [[nodiscard]] Result<IBuffer> sliceRemaining(IBuffer* bufferToSlice) {
+    Result<IBuffer> result =
+        slice(bufferToSlice, bufferToSlice->range()->endOffset(), bufferToSlice->range()->capacity());
+
+    gslogt(
+        "Sliced buffer [base=%p, offset=%zu, endOffset=%zu, capacity=%zu] to [base=%p, offset=%zu, endOffset=%zu, "
+        "capacity=%zu]\n",
+        bufferToSlice->base(),
+        bufferToSlice->range()->offset(),
+        bufferToSlice->range()->endOffset(),
+        bufferToSlice->range()->capacity(),
+        result.value->base(),
+        result.value->range()->offset(),
+        result.value->range()->endOffset(),
+        result.value->range()->capacity());
+
+    return result;
   }
 
   ABSTRACT_IREF(IBufferSliceFactory);

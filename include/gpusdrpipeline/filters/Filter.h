@@ -61,10 +61,7 @@ class Sink : public virtual Node {
    * as Source::readOutput() is another option and prevents a memcpy.
    */
   [[nodiscard]] virtual Status commitBuffer(size_t port, size_t byteCount) noexcept = 0;
-  [[nodiscard]] virtual size_t preferredInputBufferSize(size_t port) noexcept {
-    (void)port;
-    return SIZE_MAX;
-  };
+  [[nodiscard]] virtual size_t preferredInputBufferSize(size_t port) noexcept = 0;
 
   [[nodiscard]] Sink* asSink() noexcept override { return this; }
 

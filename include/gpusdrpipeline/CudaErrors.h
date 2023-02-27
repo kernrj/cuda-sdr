@@ -20,20 +20,29 @@
 #include <cuda_runtime.h>
 #include <gpusdrpipeline/GSErrors.h>
 #include <gpusdrpipeline/GSLog.h>
+#include <gpusdrpipeline/Status.h>
 
-#ifdef DEBUG
-#define GPU_SYNC_DEBUG cudaDeviceSynchronize()
-#else
-#define GPU_SYNC_DEBUG cudaSuccess
-#endif
+inline Status cudaErrorToStatus(cudaError_t cudaError) {
+  switch (cudaError) {
+    case cudaErrorInvalidValue:
+      return Status_InvalidArgument;
+    case cudaErrorIllegalAddress:
+      return Status_OutOfRange;
+    case cudaErrorIllegalState:
+      return Status_InvalidState;
+    case cudaErrorMemoryAllocation:
+      return Status_OutOfMemory;
+    default:
+      return Status_RuntimeError;
+  }
+}
 
 #ifdef DEBUG
 #define CHECK_CUDA_OR_RET(msgOnFail__, checkCudaRetOnError__) \
   do {                                                        \
     cudaError_t checkCudaStatus__ = cudaDeviceSynchronize();  \
     if (checkCudaStatus__ != cudaSuccess) {                   \
-      gslog(                                                  \
-          GSLOG_ERROR,                                        \
+      gsloge(                                                  \
           "%s: %s (%d). At %s:%d",                            \
           msgOnFail__,                                        \
           cudaGetErrorName(checkCudaStatus__),                \
@@ -49,8 +58,7 @@
   do {                                                       \
     cudaError_t checkCudaStatus__ = cudaDeviceSynchronize(); \
     if (checkCudaStatus__ != cudaSuccess) {                  \
-      gslog(                                                 \
-          GSLOG_ERROR,                                       \
+      gsloge(                                                 \
           "%s: %s (%d). At %s:%d",                           \
           msgOnFail__,                                       \
           cudaGetErrorName(checkCudaStatus__),               \
@@ -58,33 +66,31 @@
           __FILE__,                                          \
           __LINE__);                                         \
                                                              \
-      return Status_RuntimeError;                            \
+      return cudaErrorToStatus(checkCudaStatus__);           \
     }                                                        \
   } while (false)
 
-#define CHECK_CUDA_OR_RET_RESULT(msgOnFail__)                \
-  do {                                                       \
-    cudaError_t checkCudaStatus__ = cudaDeviceSynchronize(); \
-    if (checkCudaStatus__ != cudaSuccess) {                  \
-      gslog(                                                 \
-          GSLOG_ERROR,                                       \
-          "%s: %s (%d). At %s:%d",                           \
-          msgOnFail__,                                       \
-          cudaGetErrorName(checkCudaStatus__),               \
-          checkCudaStatus__,                                 \
-          __FILE__,                                          \
-          __LINE__);                                         \
-                                                             \
-      return {.status = Status_RuntimeError, .value = {}};   \
-    }                                                        \
+#define CHECK_CUDA_OR_RET_RESULT(msgOnFail__)                               \
+  do {                                                                      \
+    cudaError_t checkCudaStatus__ = cudaDeviceSynchronize();                \
+    if (checkCudaStatus__ != cudaSuccess) {                                 \
+      gsloge(                                                                \
+          "%s: %s (%d). At %s:%d",                                          \
+          msgOnFail__,                                                      \
+          cudaGetErrorName(checkCudaStatus__),                              \
+          checkCudaStatus__,                                                \
+          __FILE__,                                                         \
+          __LINE__);                                                        \
+                                                                            \
+      return {.status = cudaErrorToStatus(checkCudaStatus__), .value = {}}; \
+    }                                                                       \
   } while (false)
 
 #define CHECK_CUDA_OR_THROW(msgOnFail__)                     \
   do {                                                       \
     cudaError_t checkCudaStatus__ = cudaDeviceSynchronize(); \
     if (checkCudaStatus__ != cudaSuccess) {                  \
-      gslog(                                                 \
-          GSLOG_ERROR,                                       \
+      gsloge(                                                 \
           "%s: %s (%d). At %s:%d",                           \
           msgOnFail__,                                       \
           cudaGetErrorName(checkCudaStatus__),               \
@@ -107,8 +113,7 @@
     CHECK_CUDA_OR_RET("Before: " #cudaCmd__, safeCudaRetOnFail__); \
     cudaError_t safeCudaStatus__ = (cudaCmd__);                    \
     if (safeCudaStatus__ != cudaSuccess) {                         \
-      gslog(                                                       \
-          GSLOG_ERROR,                                             \
+      gsloge(                                                       \
           "CUDA error %s: %s. At %s:%d",                           \
           cudaGetErrorName(safeCudaStatus__),                      \
           cudaGetErrorString(safeCudaStatus__),                    \
@@ -125,35 +130,33 @@
     CHECK_CUDA_OR_RET_STATUS("Before: " #cudaCmd__); \
     cudaError_t safeCudaStatus__ = (cudaCmd__);      \
     if (safeCudaStatus__ != cudaSuccess) {           \
-      gslog(                                         \
-          GSLOG_ERROR,                               \
+      gsloge(                                         \
           "CUDA error %s: %s. At %s:%d",             \
           cudaGetErrorName(safeCudaStatus__),        \
           cudaGetErrorString(safeCudaStatus__),      \
           __FILE__,                                  \
           __LINE__);                                 \
                                                      \
-      return Status_RuntimeError;                    \
+      return cudaErrorToStatus(safeCudaStatus__);    \
     }                                                \
     CHECK_CUDA_OR_RET_STATUS("After: " #cudaCmd__);  \
   } while (false)
 
-#define SAFE_CUDA_OR_RET_RESULT(cudaCmd__)                 \
-  do {                                                     \
-    CHECK_CUDA_OR_RET_RESULT("Before: " #cudaCmd__);       \
-    cudaError_t safeCudaStatus__ = (cudaCmd__);            \
-    if (safeCudaStatus__ != cudaSuccess) {                 \
-      gslog(                                               \
-          GSLOG_ERROR,                                     \
-          "CUDA error %s: %s. At %s:%d",                   \
-          cudaGetErrorName(safeCudaStatus__),              \
-          cudaGetErrorString(safeCudaStatus__),            \
-          __FILE__,                                        \
-          __LINE__);                                       \
-                                                           \
-      return {.status = Status_RuntimeError, .value = {}}; \
-    }                                                      \
-    CHECK_CUDA_OR_RET_RESULT("After: " #cudaCmd__);        \
+#define SAFE_CUDA_OR_RET_RESULT(cudaCmd__)                                 \
+  do {                                                                     \
+    CHECK_CUDA_OR_RET_RESULT("Before: " #cudaCmd__);                       \
+    cudaError_t safeCudaStatus__ = (cudaCmd__);                            \
+    if (safeCudaStatus__ != cudaSuccess) {                                 \
+      gsloge(                                                               \
+          "CUDA error %s: %s. At %s:%d",                                   \
+          cudaGetErrorName(safeCudaStatus__),                              \
+          cudaGetErrorString(safeCudaStatus__),                            \
+          __FILE__,                                                        \
+          __LINE__);                                                       \
+                                                                           \
+      return {.status = cudaErrorToStatus(safeCudaStatus__), .value = {}}; \
+    }                                                                      \
+    CHECK_CUDA_OR_RET_RESULT("After: " #cudaCmd__);                        \
   } while (false)
 
 #define SAFE_CUDA_OR_THROW(cudaCmd__)           \
@@ -161,8 +164,7 @@
     CHECK_CUDA_OR_THROW("Before: " #cudaCmd__); \
     cudaError_t safeCudaStatus__ = (cudaCmd__); \
     if (safeCudaStatus__ != cudaSuccess) {      \
-      gslog(                                    \
-          GSLOG_ERROR,                          \
+      gsloge(                                    \
           "CUDA error %s: %s. At %s:%d",        \
           cudaGetErrorName(safeCudaStatus__),   \
           cudaGetErrorString(safeCudaStatus__), \
@@ -178,8 +180,7 @@
   do {                                          \
     cudaError_t safeCudaStatus__ = (cudaCmd__); \
     if (safeCudaStatus__ != cudaSuccess) {      \
-      gslog(                                    \
-          GSLOG_ERROR,                          \
+      gsloge(                                    \
           "CUDA error %s: %s. At %s:%d",        \
           cudaGetErrorName(safeCudaStatus__),   \
           cudaGetErrorString(safeCudaStatus__), \

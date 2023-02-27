@@ -31,16 +31,19 @@ const size_t Int8ToFloat::mAlignment = 32;
 Result<Filter> Int8ToFloat::create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
-  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
 
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
       factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
 
-  return makeRefResultNonNull<Filter>(new (
-      nothrow) Int8ToFloat(cudaDevice, cudaStream, relocatableCudaBufferFactory.get(), bufferSliceFactory, memSet));
+  return makeRefResultNonNull<Filter>(
+      new (nothrow)
+          Int8ToFloat(cudaDevice, cudaStream, relocatableCudaBufferFactory.get(), bufferSliceFactory, memSet.get()));
 }
+
 Int8ToFloat::Int8ToFloat(
     int32_t cudaDevice,
     cudaStream_t cudaStream,
@@ -86,3 +89,5 @@ Status Int8ToFloat::readOutput(IBuffer** portOutputBuffers, size_t portCount) no
 
   return Status_Success;
 }
+
+size_t Int8ToFloat::preferredInputBufferSize(size_t port) noexcept { return 1 << 20; }

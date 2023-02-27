@@ -25,7 +25,7 @@
 
 class ICudaBufferCopierFactory : public virtual IRef {
  public:
-  virtual Result<IBufferCopier> createBufferCopier(
+  [[nodiscard]] virtual Result<IBufferCopier> createBufferCopier(
       int32_t cudaDevice,
       cudaStream_t cudaStream,
       cudaMemcpyKind memcpyKind) noexcept = 0;

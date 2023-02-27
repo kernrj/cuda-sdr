@@ -23,7 +23,7 @@
 
 class ICudaAllocatorFactory : public virtual IRef {
  public:
-  virtual Result<IAllocator> createCudaAllocator(
+  [[nodiscard]] virtual Result<IAllocator> createCudaAllocator(
       int32_t cudaDevice,
       cudaStream_t cudaStream,
       size_t alignment,

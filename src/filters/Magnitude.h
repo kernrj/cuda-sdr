@@ -29,6 +29,7 @@ class Magnitude final : public BaseFilter {
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
   Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
+  [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final;
 
  private:
   static const size_t mAlignment;

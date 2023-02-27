@@ -26,8 +26,7 @@ CudaBufferCopier::CudaBufferCopier(int32_t cudaDevice, cudaStream_t cudaStream, 
 
 Status CudaBufferCopier::copy(void* dst, const void* src, size_t length) const noexcept {
   if (length > 0 && (dst == nullptr || src == nullptr)) {
-    gslog(
-        GSLOG_ERROR,
+    gsloge(
         "Cannot copy CUDA memory: the source [%p] and destination [%p] must be non-null when length [%zu] > 0",
         src,
         dst,

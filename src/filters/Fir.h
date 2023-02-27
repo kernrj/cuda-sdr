@@ -43,7 +43,8 @@ class Fir final : public BaseFilter {
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
-  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
+  [[nodiscard]] Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
+  [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final;
 
  private:
   static const size_t mAlignment;
@@ -52,10 +53,11 @@ class Fir final : public BaseFilter {
   const SampleType mElementType;
 
   ConstRef<IAllocator> mAllocator;
+  ConstRef<IBufferCopier> mHostToDeviceBufferCopier;
 
   size_t mDecimation;
   Ref<IMemory> mTaps;
-  int32_t mTapCount;
+  size_t mTapCount;
   cudaStream_t mCudaStream;
   int32_t mCudaDevice;
   const size_t mElementSize;
@@ -71,6 +73,7 @@ class Fir final : public BaseFilter {
       int32_t cudaDevice,
       cudaStream_t cudaStream,
       IAllocator* allocator,
+      IBufferCopier* hostToDeviceBufferCopier,
       IRelocatableResizableBufferFactory* relocatableBufferFactory,
       IBufferSliceFactory* bufferSliceFactory,
       IMemSet* memSet) noexcept;

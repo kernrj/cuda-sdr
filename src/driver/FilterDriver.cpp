@@ -42,6 +42,10 @@ class SinkWrapper final : public virtual Sink {
     return mSink->commitBuffer(port, byteCount);
   }
 
+  [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final {
+    return mSink->preferredInputBufferSize(port);
+  }
+
  private:
   Ref<Sink> mSink;
 
@@ -85,15 +89,15 @@ Status FilterDriver::connect(Source* source, size_t sourcePort, Sink* sink, size
   return mSteppingDriver->connect(source, sourcePort, sink, sinkPort);
 }
 
-void FilterDriver::setupNode(Node* node, const char* functionInGraph) noexcept {
-  mSteppingDriver->setupNode(node, functionInGraph);
+Status FilterDriver::setupNode(Node* node, const char* functionInGraph) noexcept {
+  return mSteppingDriver->setupNode(node, functionInGraph);
 }
 
-void FilterDriver::setupSourcePort(
+Status FilterDriver::setupSourcePort(
     Source* source,
     size_t sourcePort,
     const IBufferCopier* sourceOutputMemCopier) noexcept {
-  mSteppingDriver->setupSourcePort(source, sourcePort, sourceOutputMemCopier);
+  return mSteppingDriver->setupSourcePort(source, sourcePort, sourceOutputMemCopier);
 }
 
 void FilterDriver::iterateOverConnections(
@@ -154,7 +158,7 @@ void FilterDriver::iterateOverNodeAttributes(
 
 Result<IBuffer> FilterDriver::requestBuffer(size_t port, size_t byteCount) noexcept {
   if (mInputDelegate == nullptr) {
-    gslog(GSLOG_ERROR, "Cannot use FilterDriver as a Sink until a node is set via setDriverInput()");
+    gsloge("Cannot use FilterDriver as a Sink until a node is set via setDriverInput()");
     return ERR_RESULT(Status_InvalidState);
   }
 
@@ -163,7 +167,7 @@ Result<IBuffer> FilterDriver::requestBuffer(size_t port, size_t byteCount) noexc
 
 Status FilterDriver::commitBuffer(size_t port, size_t byteCount) noexcept {
   if (mInputDelegate == nullptr) {
-    gslog(GSLOG_ERROR, "Cannot use FilterDriver as a Sink until a node is set via setDriverInput()");
+    gsloge("Cannot use FilterDriver as a Sink until a node is set via setDriverInput()");
     return Status_InvalidState;
   }
 
@@ -173,12 +177,12 @@ Status FilterDriver::commitBuffer(size_t port, size_t byteCount) noexcept {
 
 size_t FilterDriver::getOutputDataSize(size_t port) noexcept {
   if (mOutputDelegate == nullptr) {
-    gslog(GSLOG_WARN, "Cannot use FilterDriver as a Source until a node is set via setDriverOutput()");
+    gslogw("Cannot use FilterDriver as a Source until a node is set via setDriverOutput()");
     return 0;
   }
 
   if (mOutputDelegate->getOutputDataSize(port) == 0) {
-    mSteppingDriver->doFilter();
+    RET_IF_ERR(mSteppingDriver->doFilter(), 0);
   }
 
   return mOutputDelegate->getOutputDataSize(port);
@@ -186,7 +190,7 @@ size_t FilterDriver::getOutputDataSize(size_t port) noexcept {
 
 size_t FilterDriver::getOutputSizeAlignment(size_t port) noexcept {
   if (mOutputDelegate == nullptr) {
-    gslog(GSLOG_WARN, "Cannot use FilterDriver as a Source until a node is set via setDriverOutput()");
+    gslogw("Cannot use FilterDriver as a Source until a node is set via setDriverOutput()");
     return 1;
   }
 
@@ -195,7 +199,7 @@ size_t FilterDriver::getOutputSizeAlignment(size_t port) noexcept {
 
 Status FilterDriver::readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept {
   if (mOutputDelegate == nullptr) {
-    gslog(GSLOG_ERROR, "Cannot use FilterDriver as a Source until a node is set via setDriverOutput()");
+    gsloge("Cannot use FilterDriver as a Source until a node is set via setDriverOutput()");
     return Status_InvalidState;
   }
 
@@ -208,7 +212,7 @@ Status FilterDriver::readOutput(IBuffer** portOutputBuffers, size_t numPorts) no
   }
 
   if (!allOutputPortsHaveData) {
-    mSteppingDriver->doFilter();
+    FWD_IF_ERR(mSteppingDriver->doFilter());
   }
 
   return mOutputDelegate->readOutput(portOutputBuffers, numPorts);
@@ -256,7 +260,7 @@ FilterDriver::CallbackInfo::CallbackInfo(
       nodeAttrIterator(nodeAttrIterator) {}
 
 void FilterDriver::translateConnectionIt(
-    IDriver* driver,
+    [[maybe_unused]] IDriver* driver,
     void* context,
     Source* source,
     size_t sourcePort,
@@ -267,14 +271,14 @@ void FilterDriver::translateConnectionIt(
   info->connectionIterator(info->filterDriver, info->context, source, sourcePort, sink, sinkPort);
 }
 
-void FilterDriver::translateNodeIt(IDriver* driver, void* context, Node* node) noexcept {
+void FilterDriver::translateNodeIt([[maybe_unused]] IDriver* driver, void* context, Node* node) noexcept {
   auto info = reinterpret_cast<CallbackInfo*>(context);
   GS_REQUIRE_OR_ABORT(info->nodeIterator != nullptr, "Node iterator not set");
   info->nodeIterator(info->filterDriver, info->context, node);
 }
 
 void FilterDriver::translateNodeAttrIt(
-    IDriver* driver,
+    [[maybe_unused]] IDriver* driver,
     Node* node,
     void* context,
     const char* attrName,
@@ -286,4 +290,8 @@ void FilterDriver::translateNodeAttrIt(
 
 size_t FilterDriver::getNodeName(Node* node, char* name, size_t nameBufLen, bool* foundOut) noexcept {
   return mSteppingDriver->getNodeName(node, name, nameBufLen, foundOut);
+}
+
+size_t FilterDriver::preferredInputBufferSize(size_t port) noexcept {
+  return mInputDelegate->preferredInputBufferSize(port);
 }

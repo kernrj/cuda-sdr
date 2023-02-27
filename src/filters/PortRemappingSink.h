@@ -28,8 +28,9 @@ class PortRemappingSink final : public IPortRemappingSink {
 
   void addPortMapping(size_t outerPort, size_t innerPort) noexcept final;
 
-  Result<IBuffer> requestBuffer(size_t port, size_t byteCount) noexcept final;
+  [[nodiscard]] Result<IBuffer> requestBuffer(size_t port, size_t byteCount) noexcept final;
   [[nodiscard]] Status commitBuffer(size_t port, size_t byteCount) noexcept final;
+  [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final;
 
  private:
   ConstRef<Sink> mMapToSink;

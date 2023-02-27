@@ -91,7 +91,7 @@ static void waitForStop(const gr::top_block_sptr& topBlock) {
   Thread2 blockWaitThread([topBlock]() {
     topBlock->wait();
 
-    gslog(GSLOG_INFO, "Graph ended");
+    gslogi("Graph ended");
     wasInterrupted.store(true);
     wasInterruptedCv.notify_all();
   });
@@ -103,7 +103,7 @@ static void waitForStop(const gr::top_block_sptr& topBlock) {
 }
 
 static void exitSigHandler(int signum) {
-  gslog(GSLOG_INFO, "Caught signal %d, cleaning up.", signum);
+  gslogi("Caught signal %d, cleaning up.", signum);
   cleanupThings();
 
   if (signum == SIGINT || signum == SIGTERM) {
@@ -155,13 +155,13 @@ int raw() {
   const auto fileSink = gr::blocks::file_sink::make(8, filename);
   topBlock->connect(osmoSource, 0, fileSink, 0);
 
-  gslog(GSLOG_INFO, "Starting...");
+  gslogi("Starting...");
   topBlock->start();
-  gslog(GSLOG_INFO, "Started");
+  gslogi("Started");
 
   waitForStop(topBlock);
 
-  gslog(GSLOG_INFO, "Done");
+  gslogi("Done");
   return 0;
 }
 
@@ -211,13 +211,13 @@ int nbfmFromRaw() {
     topBlock->connect(fmDemod, 0, wavFileSink, 0);
   }
 
-  gslog(GSLOG_INFO, "Starting...");
+  gslogi("Starting...");
   topBlock->start();
-  gslog(GSLOG_INFO, "Started");
+  gslogi("Started");
 
   waitForStop(topBlock);
 
-  gslog(GSLOG_INFO, "Done");
+  gslogi("Done");
   return 0;
 }
 
@@ -273,13 +273,13 @@ int nbfm() {
     topBlock->connect(fmDemod, 0, wavFileSink, 0);
   }
 
-  gslog(GSLOG_INFO, "Starting...");
+  gslogi("Starting...");
   topBlock->start();
-  gslog(GSLOG_INFO, "Started");
+  gslogi("Started");
 
   waitForStop(topBlock);
 
-  gslog(GSLOG_INFO, "Done");
+  gslogi("Done");
   return 0;
 }
 
@@ -350,12 +350,12 @@ int fmRadio(int argc, char** argv) {
     topBlock->connect(fmDemod, 0, wavFileSink, 0);
   }
 
-  gslog(GSLOG_INFO, "Starting...");
+  gslogi("Starting...");
   topBlock->start();
-  gslog(GSLOG_INFO, "Started");
+  gslogi("Started");
 
   waitForStop(topBlock);
 
-  gslog(GSLOG_INFO, "Done");
+  gslogi("Done");
   return 0;
 }

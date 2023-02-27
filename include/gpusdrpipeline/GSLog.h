@@ -41,12 +41,18 @@ class ILogger : public virtual IRef {
   ABSTRACT_IREF(ILogger);
 };
 
-GS_EXPORT const char* gslogLevelName(LogLevel level) noexcept;
+GS_EXPORT [[nodiscard]] const char* gslogLevelName(LogLevel level) noexcept;
 
-GS_EXPORT GS_FMT_ATTR(2, 3) void gslog(LogLevel level, GS_FMT_STR(const char* fmt), ...) noexcept;
 GS_EXPORT void gsvlog(LogLevel level, GS_FMT_STR(const char* fmt), va_list args) noexcept;
 
 GS_EXPORT void gslogSetLogger(ILogger* logger) noexcept;
 GS_EXPORT void gslogSetVerbosity(LogLevel level) noexcept;
+
+GS_EXPORT GS_FMT_ATTR(1, 2) void gslogt(GS_FMT_STR(const char* fmt), ...) noexcept; /// Trace-level log
+GS_EXPORT GS_FMT_ATTR(1, 2) void gslogd(GS_FMT_STR(const char* fmt), ...) noexcept; /// Debug-level log
+GS_EXPORT GS_FMT_ATTR(1, 2) void gslogi(GS_FMT_STR(const char* fmt), ...) noexcept; /// Info-level log
+GS_EXPORT GS_FMT_ATTR(1, 2) void gslogw(GS_FMT_STR(const char* fmt), ...) noexcept; /// Warn-level log
+GS_EXPORT GS_FMT_ATTR(1, 2) void gsloge(GS_FMT_STR(const char* fmt), ...) noexcept; /// Error-level log
+GS_EXPORT [[noreturn]] GS_FMT_ATTR(1, 2) void gslogf(GS_FMT_STR(const char* fmt), ...) noexcept; /// Fatal-level log
 
 #endif  // GPUSDRPIPELINE_GSLOG_H

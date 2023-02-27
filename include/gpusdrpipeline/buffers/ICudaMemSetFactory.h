@@ -28,7 +28,7 @@
 
 class ICudaMemSetFactory : public virtual IRef {
  public:
-  virtual Result<IMemSet> create(int32_t cudaDevice, cudaStream_t cudaStream) noexcept = 0;
+  [[nodiscard]] virtual Result<IMemSet> create(int32_t cudaDevice, cudaStream_t cudaStream) noexcept = 0;
 
   ABSTRACT_IREF(ICudaMemSetFactory);
 };

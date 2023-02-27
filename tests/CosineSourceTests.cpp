@@ -32,20 +32,15 @@ TEST(WhenCosineSourceOutputs, ItMatchesCpuCalculations) {
   const size_t outputBufferSize = outputValueCount * sizeof(cuComplex);
   ConstRef<IBuffer> outputBuffer = unwrap(cudaGpuBufferFactory->createBuffer(outputBufferSize));
   outputBuffers.push_back(outputBuffer.get());
-  cudaMemSet->memSet(outputBuffers[0]->writePtr(), 0, outputBuffers[0]->range()->capacity());
-  throwIfError(cosineSource->readOutput(outputBuffers.data(), 1));
+  THROW_IF_ERR(cudaMemSet->memSet(outputBuffers[0]->writePtr(), 0, outputBuffers[0]->range()->capacity()));
+  THROW_IF_ERR(cosineSource->readOutput(outputBuffers.data(), 1));
 
   auto hostMem = unwrap(cudaHostBufferFactory->createBuffer(outputBuffers[0]->range()->used()));
   hostMem->range()->clearRange();
-  gslog(
-      GSLOG_DEBUG,
-      "Copying [%zu] bytes from [%p] to [%p]",
-      outputBuffers[0]->range()->used(),
-      outputBuffers[0]->readPtr(),
-      hostMem->writePtr());
-  throwIfError(
+
+  THROW_IF_ERR(
       deviceToHostMemCopier->copy(hostMem->writePtr(), outputBuffers[0]->readPtr(), outputBuffers[0]->range()->used()));
-  throwIfError(hostMem->range()->setUsedRange(0, outputBuffers[0]->range()->used()));
+  THROW_IF_ERR(hostMem->range()->setUsedRange(0, outputBuffers[0]->range()->used()));
 
   auto values = hostMem->readPtr<cuComplex>();
 

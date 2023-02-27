@@ -43,21 +43,20 @@ static size_t getEndOffset(IBuffer* bufferBeingSliced, size_t sliceStart, size_t
 
 class SliceRange final : public IBufferRange {
  public:
-  SliceRange(size_t sliceStart, size_t sliceEnd, IBuffer* parentBuffer)
-      : mSliceStart(sliceStart),
-        mSliceEnd(sliceEnd),
-        mParentBuffer(parentBuffer),
-        mOffset(getStartOffset(parentBuffer, sliceStart, sliceEnd)),
-        mEndOffset(getEndOffset(parentBuffer, sliceStart, sliceEnd)) {
-    if (mSliceStart > sliceEnd) {
-      GS_FAIL("Invalid slice range: start [" << mSliceStart << "] end [" << sliceEnd << "]");
-    }
+  static Result<IBufferRange> create(size_t sliceStart, size_t sliceEnd, IBuffer* parentBuffer) noexcept {
+    GS_REQUIRE_OR_RET_RESULT_FMT(
+        sliceStart <= sliceEnd,
+        "Invalid slice range: start[%zu] end [%zu]",
+        sliceStart,
+        sliceEnd);
 
-    if (sliceEnd > parentBuffer->range()->capacity()) {
-      GS_FAIL(
-          "Invalid slice end-offset [" << sliceEnd << "]: Maximum value is [" << parentBuffer->range()->capacity()
-                                       << "]");
-    }
+    GS_REQUIRE_OR_RET_RESULT_FMT(
+        sliceEnd <= parentBuffer->range()->capacity(),
+        "Invalid slice end-offset [%zu]: maximum value is [%zu]",
+        sliceEnd,
+        parentBuffer->range()->capacity());
+
+    return makeRefResultNonNull<IBufferRange>(new(nothrow) SliceRange(sliceStart, sliceEnd, parentBuffer));
   }
 
   [[nodiscard]] size_t capacity() const noexcept final {
@@ -70,23 +69,19 @@ class SliceRange final : public IBufferRange {
   Status setUsedRange(size_t offset, size_t endOffset) noexcept final {
     const size_t currentCapacity = capacity();
 
-    if (offset > endOffset) {
-      gslog(
-          GSLOG_ERROR,
-          "Error setting used range: Offset [%zu] cannot be greater than the end offset [%zu]",
-          offset,
-          endOffset);
+    GS_REQUIRE_OR_RET_FMT(
+        offset <= endOffset,
+        Status_InvalidArgument,
+        "Error setting used range: Offset [%zu] cannot be greater than the end offset [%zu]",
+        offset,
+        endOffset);
 
-      return Status_InvalidArgument;
-    } else if (endOffset > currentCapacity) {
-      gslog(
-          GSLOG_ERROR,
-          "Errorsetting used range: End offset [%zu] cannot be greater than the capacitiy [%zu]",
-          endOffset,
-          currentCapacity);
-
-      return Status_InvalidArgument;
-    }
+    GS_REQUIRE_OR_RET_FMT(
+        endOffset <= currentCapacity,
+        Status_InvalidArgument,
+        "Error setting used range: End offset [%zu] cannot be greater than the capacity [%zu]",
+        endOffset,
+        currentCapacity);
 
     mOffset = offset;
     mEndOffset = endOffset;
@@ -103,12 +98,55 @@ class SliceRange final : public IBufferRange {
   size_t mEndOffset;
 
  private:
+  SliceRange(size_t sliceStart, size_t sliceEnd, IBuffer* parentBuffer) noexcept
+      : mSliceStart(sliceStart),
+        mSliceEnd(sliceEnd),
+        mParentBuffer(parentBuffer),
+        mOffset(getStartOffset(parentBuffer, sliceStart, sliceEnd)),
+        mEndOffset(getEndOffset(parentBuffer, sliceStart, sliceEnd)) {}
+
   [[nodiscard]] size_t clampToParentCapacity(size_t index) const { return min(index, capacity()); }
   [[nodiscard]] size_t sliceStart() const { return min(mSliceStart, mParentBuffer->range()->capacity()); }
   [[nodiscard]] size_t sliceEnd() const { return min(mSliceEnd, mParentBuffer->range()->capacity()); }
 
   REF_COUNTED(SliceRange);
 };
+
+static size_t clamp(size_t valueToClamp, size_t minValue, size_t maxValue) noexcept {
+  return min(max(minValue, valueToClamp), maxValue);
+}
+
+void BufferSlice::getSliceOffsetsFromOriginal(
+    size_t originalOffset,
+    size_t originalEndOffset,
+    size_t sliceStart,
+    size_t sliceEnd,
+    size_t* newSliceOffsetOut,
+    size_t* newSliceEndOffsetOut) noexcept {
+  if (sliceStart < originalOffset && sliceEnd < originalOffset) {
+    *newSliceOffsetOut = 0;
+    *newSliceEndOffsetOut = 0;
+    return;
+  }
+
+  const size_t clampedOffset = clamp(sliceStart, originalOffset, originalEndOffset);
+  const size_t clampedEndOffset = clamp(sliceEnd, originalOffset, originalEndOffset);
+
+  *newSliceOffsetOut = clampedOffset - sliceStart;
+  *newSliceEndOffsetOut = clampedEndOffset - sliceStart;
+
+  gslogt(
+      "Slice calculations - orig offset [%zu] orig end [%zu] slice start [%zu] slice end [%zu] clamped offset [%zu] "
+      "clamped end [%zu] new slice offset [%zu] new slice end [%zu]\n",
+      originalOffset,
+      originalEndOffset,
+      sliceStart,
+      sliceEnd,
+      clampedOffset,
+      clampedEndOffset,
+      *newSliceOffsetOut,
+      *newSliceEndOffsetOut);
+}
 
 Result<IBuffer> BufferSlice::create(
     IBuffer* slicedBuffer,
@@ -118,7 +156,17 @@ Result<IBuffer> BufferSlice::create(
   Ref<IBufferRangeMutableCapacity> bufferRange;
   UNWRAP_OR_FWD_RESULT(bufferRange, bufferRangeFactory->createBufferRange());
   bufferRange->setCapacity(sliceEnd - sliceStart);
-  FWD_IN_RESULT_IF_ERR(bufferRange->setUsedRange(0, bufferRange->capacity()));
+
+  size_t offsetInSlice;
+  size_t endOffsetInSlice;
+  getSliceOffsetsFromOriginal(
+      slicedBuffer->range()->offset(),
+      slicedBuffer->range()->endOffset(),
+      sliceStart,
+      sliceEnd,
+      &offsetInSlice,
+      &endOffsetInSlice);
+  FWD_IN_RESULT_IF_ERR(bufferRange->setUsedRange(offsetInSlice, endOffsetInSlice));
 
   return makeRefResultNonNull<IBuffer>(new (nothrow) BufferSlice(slicedBuffer, sliceStart, bufferRange.get()));
 }

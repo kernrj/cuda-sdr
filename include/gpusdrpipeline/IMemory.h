@@ -28,12 +28,12 @@ class IMemory : public virtual IRef {
   [[nodiscard]] virtual size_t capacity() const noexcept = 0;
 
   template <typename T = uint8_t>
-  T* as() noexcept {
+  [[nodiscard]] T* as() noexcept {
     return reinterpret_cast<T*>(data());
   }
 
   template <typename T = uint8_t>
-  const T* as() const noexcept {
+  [[nodiscard]] const T* as() const noexcept {
     return reinterpret_cast<T*>(data());
   }
 

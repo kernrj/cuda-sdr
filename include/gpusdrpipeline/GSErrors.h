@@ -60,80 +60,100 @@
   } while (false)
 #endif
 
-#define GS_REQUIRE_OR_RET_STATUS(requireCmd__, messageOnFalse__)                                \
-  do {                                                                                          \
-    if (!(requireCmd__)) {                                                                      \
-      gslog(GSLOG_ERROR, "Expression must be true [%s] - %s", #requireCmd__, messageOnFalse__); \
-      return Status_InvalidArgument;                                                            \
-    }                                                                                           \
+#define GS_REQUIRE_OR_RET_STATUS(requireCmd__, messageOnFalse__)                                                   \
+  do {                                                                                                             \
+    if (!(requireCmd__)) {                                                                                         \
+      gslogd("Expression must be true [%s] - %s - at %s:%d", #requireCmd__, messageOnFalse__, __FILE__, __LINE__); \
+      return Status_InvalidArgument;                                                                               \
+    }                                                                                                              \
   } while (false)
 
-#define GS_REQUIRE_OR_ABORT(requireCmd__, messageOnFalse__)                                     \
-  do {                                                                                          \
-    if (!(requireCmd__)) {                                                                      \
-      gslog(GSLOG_ERROR, "Expression must be true [%s] - %s", #requireCmd__, messageOnFalse__); \
-      abort();                                                                                  \
-    }                                                                                           \
+#define GS_REQUIRE_OR_ABORT(requireCmd__, messageOnFalse__) \
+  do {                                                      \
+    if (!(requireCmd__)) {                                  \
+      gsloge(                                                \
+          "Expression must be true [%s] - %s - at %s:%d",   \
+          #requireCmd__,                                    \
+          messageOnFalse__,                                 \
+          __FILE__,                                         \
+          __LINE__);                                        \
+      abort();                                              \
+    }                                                       \
   } while (false)
 
-#define GS_REQUIRE_OR_RET_STATUS_FMT(requireCmd__, messageFmtOnFalse__, ...) \
+#define GS_REQUIRE_OR_RET_STATUS_FMT(requireCmd__, messageFmtOnFalse__, ...)                \
+  do {                                                                                      \
+    if (!(requireCmd__)) {                                                                  \
+      gsloge("Expression must be true [%s] - at %s:%d", #requireCmd__, __FILE__, __LINE__); \
+      gsloge(messageFmtOnFalse__, __VA_ARGS__);                                             \
+      return Status_InvalidArgument;                                                        \
+    }                                                                                       \
+  } while (false)
+
+#define GS_REQUIRE_OR_RET_RESULT_FMT(requireCmd__, messageFmtOnFalse__, ...)                \
+  do {                                                                                      \
+    if (!(requireCmd__)) {                                                                  \
+      gsloge("Expression must be true [%s] - at %s:%d", #requireCmd__, __FILE__, __LINE__); \
+      gsloge(messageFmtOnFalse__, __VA_ARGS__);                                             \
+      return {.status = Status_InvalidArgument, .value = {}};                               \
+    }                                                                                       \
+  } while (false)
+
+#define GS_REQUIRE_OR_RET_FMT(requireCmd__, returnOnFalse__, messageFmtOnFalse__, ...)      \
+  do {                                                                                      \
+    if (!(requireCmd__)) {                                                                  \
+      gsloge("Expression must be true [%s] - at %s:%d", #requireCmd__, __FILE__, __LINE__); \
+      gsloge(messageFmtOnFalse__, __VA_ARGS__);                                             \
+      return returnOnFalse__;                                                               \
+    }                                                                                       \
+  } while (false)
+
+#define GS_REQUIRE_OR_RET_RESULT(requireCmd__, messageOnFalse__) \
+  do {                                                           \
+    if (!(requireCmd__)) {                                       \
+      gsloge(                                                     \
+          "Expression must be true [%s] - %s - at %s:%d",        \
+          #requireCmd__,                                         \
+          messageOnFalse__,                                      \
+          __FILE__,                                              \
+          __LINE__);                                             \
+      return ERR_RESULT(Status_InvalidArgument);                 \
+    }                                                            \
+  } while (false)
+
+#define GS_REQUIRE_OR_RET(requireCmd__, messageOnFalse__, retValueOnFalse__) \
   do {                                                                       \
     if (!(requireCmd__)) {                                                   \
-      gslog(GSLOG_ERROR, "Expression must be true [%s]", #requireCmd__);     \
-      gslog(GSLOG_ERROR, messageFmtOnFalse__, __VA_ARGS__);                  \
-      return Status_InvalidArgument;                                         \
+      gsloge(                                                                 \
+          "Expression must be true [%s] - %s - at %s:%d",                    \
+          #requireCmd__,                                                     \
+          messageOnFalse__,                                                  \
+          __FILE__,                                                          \
+          __LINE__);                                                         \
+      return retValueOnFalse__;                                              \
     }                                                                        \
   } while (false)
 
-#define GS_REQUIRE_OR_RET_RESULT_FMT(requireCmd__, messageFmtOnFalse__, ...) \
-  do {                                                                       \
-    if (!(requireCmd__)) {                                                   \
-      gslog(GSLOG_ERROR, "Expression must be true [%s]", #requireCmd__);     \
-      gslog(GSLOG_ERROR, messageFmtOnFalse__, __VA_ARGS__);                  \
-      return {.status = Status_InvalidArgument, .value = {}};                \
-    }                                                                        \
+#define GS_REQUIRE_OR_THROW(requireCmd__, messageOnFalse__) \
+  do {                                                      \
+    if (!(requireCmd__)) {                                  \
+      gsloge(                                                \
+          "Expression must be true [%s] - %s - at %s:%d",   \
+          #requireCmd__,                                    \
+          messageOnFalse__,                                 \
+          __FILE__,                                         \
+          __LINE__);                                        \
+      throw std::runtime_error("Failed assertion");         \
+    }                                                       \
   } while (false)
 
-#define GS_REQUIRE_OR_RET_FMT(requireCmd__, returnOnFalse__, messageFmtOnFalse__, ...) \
-  do {                                                                                 \
-    if (!(requireCmd__)) {                                                             \
-      gslog(GSLOG_ERROR, "Expression must be true [%s]", #requireCmd__);               \
-      gslog(GSLOG_ERROR, messageFmtOnFalse__, __VA_ARGS__);                            \
-      return returnOnFalse__;                                                          \
-    }                                                                                  \
-  } while (false)
-
-#define GS_REQUIRE_OR_RET_RESULT(requireCmd__, messageOnFalse__)                                \
-  do {                                                                                          \
-    if (!(requireCmd__)) {                                                                      \
-      gslog(GSLOG_ERROR, "Expression must be true [%s] - %s", #requireCmd__, messageOnFalse__); \
-      return ERR_RESULT(Status_InvalidArgument);                                                \
-    }                                                                                           \
-  } while (false)
-
-#define GS_REQUIRE_OR_RET(requireCmd__, messageOnFalse__, retValueOnFalse__)                    \
-  do {                                                                                          \
-    if (!(requireCmd__)) {                                                                      \
-      gslog(GSLOG_ERROR, "Expression must be true [%s] - %s", #requireCmd__, messageOnFalse__); \
-      return retValueOnFalse__;                                                                 \
-    }                                                                                           \
-  } while (false)
-
-#define GS_REQUIRE_OR_THROW(requireCmd__, messageOnFalse__)                                     \
-  do {                                                                                          \
-    if (!(requireCmd__)) {                                                                      \
-      gslog(GSLOG_ERROR, "Expression must be true [%s] - %s", #requireCmd__, messageOnFalse__); \
-      throw std::runtime_error("Failed assertion");                                             \
-    }                                                                                           \
-  } while (false)
-
-#define GS_REQUIRE_OR_THROW_FMT(requireCmd__, messageFmtOnFalse__, ...)  \
-  do {                                                                   \
-    if (!(requireCmd__)) {                                               \
-      gslog(GSLOG_ERROR, "Expression must be true [%s]", #requireCmd__); \
-      gslog(GSLOG_ERROR, messageFmtOnFalse__, __VA_ARGS__);              \
-      throw std::runtime_error("Failed assertion");                      \
-    }                                                                    \
+#define GS_REQUIRE_OR_THROW_FMT(requireCmd__, messageFmtOnFalse__, ...)                     \
+  do {                                                                                      \
+    if (!(requireCmd__)) {                                                                  \
+      gsloge("Expression must be true [%s] - at %s:%d", #requireCmd__, __FILE__, __LINE__); \
+      gsloge(messageFmtOnFalse__, __VA_ARGS__);                                             \
+      throw std::runtime_error("Failed assertion");                                         \
+    }                                                                                       \
   } while (false)
 
 #define GS_REQUIRE_EQ(requireExpectedVal__, requireCmd__, messageOnNotEq__)                                     \

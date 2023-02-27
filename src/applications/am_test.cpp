@@ -56,7 +56,7 @@ static void exitSigHandler(int signum) {
     return;
   }
 
-  gslog(GSLOG_INFO, "Caught signal %d, cleaning up.", signum);
+  gslogi("Caught signal %d, cleaning up.", signum);
   cleanupThings();
 
   if (signum == SIGINT || signum == SIGTERM) {
@@ -92,12 +92,12 @@ static ImmutableRef<Source> createQuadFileInputPipeline(
   ConstRef<IFilterDriver> driver = unwrap(factories->getFilterDriverFactory()->createFilterDriver());
   THROW_IF_ERR(driver->connect(fileReader, 0, hostToDevice, 0));
 
-  driver->setupNode(fileReader, "Read quadrature samples from file");
-  driver->setupNode(hostToDevice, "Copy quadrature samples to GPU");
+  THROW_IF_ERR(driver->setupNode(fileReader, "Read quadrature samples from file"));
+  THROW_IF_ERR(driver->setupNode(hostToDevice, "Copy quadrature samples to GPU"));
 
   driver->setDriverOutput(hostToDevice);
 
-  gslog(GSLOG_INFO, "Created file-based input from [%s]", fileName);
+  gslogi("Created file-based input from [%s]", fileName);
   ImmutableRef<Source> driverAsSource = driver.get();
 
   return driverAsSource;
@@ -122,8 +122,8 @@ static ImmutableRef<Sink> createAacFileOutputPipeline(
   driver->setDriverInput(deviceToHost);
   THROW_IF_ERR(driver->connect(deviceToHost, 0, audioOutput, 0));
 
-  driver->setupNode(deviceToHost, "Copy audio samples from GPU to System Memory");
-  driver->setupNode(audioOutput, "Encode and mux audio to a file");
+  THROW_IF_ERR(driver->setupNode(deviceToHost, "Copy audio samples from GPU to System Memory"));
+  THROW_IF_ERR(driver->setupNode(audioOutput, "Encode and mux audio to a file"));
 
   *outputByteCountWritten = deviceToHost;
 
@@ -340,9 +340,9 @@ static ImmutableRef<Filter> createFrequencyShifter(
   multiplyWithOnlyPort0Exposed->addPortMapping(0, 0);
 
   auto driver = unwrap(factories->getFilterDriverFactory()->createFilterDriver());
-  driver->setupNode(cosineSource, SSTREAM("Produce a cosine signal [" << name << "]").c_str());
-  driver->setupNode(multiplyRfSourceByCosine, SSTREAM("Multiply signals [" << name << "]").c_str());
-  driver->setupNode(lowPassFilter, SSTREAM("Low-pass filter to smooth out frequency shift [" << name << "]").c_str());
+  THROW_IF_ERR(driver->setupNode(cosineSource, SSTREAM("Produce a cosine signal [" << name << "]").c_str()));
+  THROW_IF_ERR(driver->setupNode(multiplyRfSourceByCosine, SSTREAM("Multiply signals [" << name << "]").c_str()));
+  THROW_IF_ERR(driver->setupNode(lowPassFilter, SSTREAM("Low-pass filter to smooth out frequency shift [" << name << "]").c_str()));
 
   driver->setDriverInput(multiplyWithOnlyPort0Exposed);
   driver->setDriverOutput(lowPassFilter);
@@ -372,11 +372,11 @@ static ImmutableRef<Source> createHackrfInputPipeline(
   THROW_IF_ERR(driver->connect(hostToDevice, 0, int8ToFloat, 0));
   driver->setDriverOutput(int8ToFloat);
 
-  driver->setupNode(hackrfInput, "Get HackRF samples");
-  driver->setupNode(hostToDevice, "Copy HackRF samples to GPU memory");
-  driver->setupNode(int8ToFloat, "Convert HackRF complex int8 format to complex float");
+  THROW_IF_ERR(driver->setupNode(hackrfInput, "Get HackRF samples"));
+  THROW_IF_ERR(driver->setupNode(hostToDevice, "Copy HackRF samples to GPU memory"));
+  THROW_IF_ERR(driver->setupNode(int8ToFloat, "Convert HackRF complex int8 format to complex float"));
 
-  runAtExit.emplace([hackrfInput]() { hackrfInput->releaseDevice(); });
+  runAtExit.emplace([hackrfInput]() { THROW_IF_ERR(hackrfInput->releaseDevice()); });
 
   return ImmutableRef<Source>(driver.get());
 }
@@ -433,9 +433,9 @@ static ImmutableRef<Filter> createRfToAudioPipeline(
   THROW_IF_ERR(driver->connect(rfFrequencyShifter, 0, quadDemod, 0));
   THROW_IF_ERR(driver->connect(quadDemod, 0, audioFilter, 0));
 
-  driver->setupNode(rfFrequencyShifter, "Shift RF frequency of channel");
-  driver->setupNode(quadDemod, "Demodulate FM from Quadrature input");
-  driver->setupNode(audioFilter, "Process audio");
+  THROW_IF_ERR(driver->setupNode(rfFrequencyShifter, "Shift RF frequency of channel"));
+  THROW_IF_ERR(driver->setupNode(quadDemod, "Demodulate FM from Quadrature input"));
+  THROW_IF_ERR(driver->setupNode(audioFilter, "Process audio"));
 
   return ImmutableRef<Filter>(driver);
 }
@@ -495,14 +495,14 @@ int main(int argc, char** argv) {
   THROW_IF_ERR(driver->connect(inputPipeline, 0, rfToAudio, 0));
   THROW_IF_ERR(driver->connect(rfToAudio, 0, outputPipeline, 0));
 
-  driver->setupNode(inputPipeline, "RF Input Pipeline");
-  driver->setupNode(rfToAudio, "Convert RF signal to audio");
-  driver->setupNode(outputPipeline, "Audio Output Pipeline");
+  THROW_IF_ERR(driver->setupNode(inputPipeline, "RF Input Pipeline"));
+  THROW_IF_ERR(driver->setupNode(rfToAudio, "Convert RF signal to audio"));
+  THROW_IF_ERR(driver->setupNode(outputPipeline, "Audio Output Pipeline"));
 
   const size_t maxSampleCount = lrint(audioSampleRate) * 10;
   size_t itCount = 0;
   while (readByteCountMonitor->getByteCountRead(0) / sizeof(float) < maxSampleCount) {
-    driver->doFilter();
+    THROW_IF_ERR(driver->doFilter());
   }
 
   return 0;

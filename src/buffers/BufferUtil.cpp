@@ -27,7 +27,7 @@ Status BufferUtil::appendToBuffer(IBuffer* buffer, const void* src, size_t count
     const noexcept {
   const size_t numRemainingBytes = buffer->range()->remaining();
   if (count > numRemainingBytes) {
-    gslog(GSLOG_ERROR, "Cannot copy [%zu] bytes. Only [%zu] bytes remain.", count, numRemainingBytes);
+    gsloge("Cannot copy [%zu] bytes. Only [%zu] bytes remain.", count, numRemainingBytes);
     return Status_InvalidArgument;
   }
 
@@ -41,7 +41,7 @@ Status BufferUtil::readFromBuffer(void* dst, IBuffer* buffer, size_t count, cons
     const noexcept {
   const size_t currentNumUsedBytes = buffer->range()->used();
   if (count > currentNumUsedBytes) {
-    gslog(GSLOG_ERROR, "Cannot copy [%zu] bytes - only [%zu] are available in the source", count, currentNumUsedBytes);
+    gsloge("Cannot copy [%zu] bytes - only [%zu] are available in the source", count, currentNumUsedBytes);
     return Status_InvalidArgument;
   }
 
@@ -55,18 +55,19 @@ Status BufferUtil::moveFromBuffer(IBuffer* dst, IBuffer* src, size_t count, cons
     const noexcept {
   const size_t srcNumUsedBytes = src->range()->used();
   const size_t dstNumRemainingBytes = dst->range()->remaining();
-  if (count > srcNumUsedBytes) {
-    gslog(GSLOG_ERROR, "Cannot copy [%zu] bytes - only [%zu] are available in the source", count, srcNumUsedBytes);
-    return Status_InvalidArgument;
-  } else if (count > dstNumRemainingBytes) {
-    gslog(
-        GSLOG_ERROR,
-        "Cannot copy [%zu] bytes - only [%zu] are remaining in the destination",
-        count,
-        dstNumRemainingBytes);
 
-    return Status_InvalidArgument;
-  }
+  GS_REQUIRE_OR_RET_FMT(
+      count <= srcNumUsedBytes,
+      Status_InvalidArgument,
+      "Cannot copy [%zu] bytes - only [%zu] are available in the source",
+      count,
+      srcNumUsedBytes);
+  GS_REQUIRE_OR_RET_FMT(
+      count <= dstNumRemainingBytes,
+      Status_InvalidArgument,
+      "Cannot copy [%zu] bytes - only [%zu] are remaining in the destination",
+      count,
+      dstNumRemainingBytes);
 
   const uint8_t* srcPtr = src->readPtr();
   uint8_t* dstPtr = dst->writePtr();

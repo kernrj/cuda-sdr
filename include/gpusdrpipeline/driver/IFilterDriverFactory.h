@@ -21,7 +21,7 @@
 
 class IFilterDriverFactory : public virtual IRef {
  public:
-  virtual Result<IFilterDriver> createFilterDriver() noexcept = 0;
+  [[nodiscard]] virtual Result<IFilterDriver> createFilterDriver() noexcept = 0;
 
   ABSTRACT_IREF(IFilterDriverFactory);
 };

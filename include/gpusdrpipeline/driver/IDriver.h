@@ -34,7 +34,7 @@ class IDriver : public Node {
    */
   [[nodiscard]] virtual Status connect(Source* source, size_t sourcePort, Sink* sink, size_t sinkPort) noexcept = 0;
 
-  virtual void setupNode(Node* node, const char* functionInGraph) noexcept = 0;
+  [[nodiscard]] virtual Status setupNode(Node* node, const char* functionInGraph) noexcept = 0;
 
   virtual void iterateOverConnections(
       void* context,
@@ -60,7 +60,7 @@ class IDriver : public Node {
 
   virtual size_t getNodeName(Node* node, char* name, size_t nameBufLen, bool* foundOut) noexcept = 0;
 
-  virtual void setupSourcePort(
+  [[nodiscard]] virtual Status setupSourcePort(
       Source* source,
       size_t sourcePort,
       const IBufferCopier* sourceOutputMemCopier) noexcept = 0;

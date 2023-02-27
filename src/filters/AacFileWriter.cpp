@@ -37,8 +37,7 @@ using namespace std;
       char ffmpegErrorDescription__[128];                                                               \
       av_make_error_string(ffmpegErrorDescription__, sizeof(ffmpegErrorDescription__), ffmpegStatus__); \
                                                                                                         \
-      gslog(                                                                                            \
-          GSLOG_ERROR,                                                                                  \
+      gsloge(                                                                                            \
           "FFmpeg error [%d]: %s. At %s:%d",                                                            \
           ffmpegStatus__,                                                                               \
           ffmpegErrorDescription__,                                                                     \
@@ -55,8 +54,7 @@ using namespace std;
       char ffmpegErrorDescription__[128];                                                               \
       av_make_error_string(ffmpegErrorDescription__, sizeof(ffmpegErrorDescription__), ffmpegStatus__); \
                                                                                                         \
-      gslog(                                                                                            \
-          GSLOG_ERROR,                                                                                  \
+      gsloge(                                                                                            \
           "FFmpeg error %d: %s. At %s:%d",                                                              \
           ffmpegStatus__,                                                                               \
           ffmpegErrorDescription__,                                                                     \
@@ -85,8 +83,7 @@ static Status ffmpegErrToStatus(int ffmpegStatus) noexcept {
       char ffmpegErrorDescription__[128];                                                               \
       av_make_error_string(ffmpegErrorDescription__, sizeof(ffmpegErrorDescription__), ffmpegStatus__); \
                                                                                                         \
-      gslog(                                                                                            \
-          GSLOG_ERROR,                                                                                  \
+      gsloge(                                                                                            \
           "FFmpeg error %d: %s. At %s:%d",                                                              \
           ffmpegStatus__,                                                                               \
           ffmpegErrorDescription__,                                                                     \
@@ -192,7 +189,7 @@ static shared_ptr<AVBufferPool> createBufferPool(const shared_ptr<AVCodecContext
 static shared_ptr<AVPacket> createAvPacket() {
   AVPacket* avPacketRaw = av_packet_alloc();
   if (avPacketRaw == nullptr) {
-    gslog(GSLOG_ERROR, "Failed to create AVPcket: Out of memory");
+    gsloge("Failed to create AVPcket: Out of memory");
     throw bad_alloc();
   }
 
@@ -259,8 +256,7 @@ AacFileWriter::AacFileWriter(
       mClosedCodecCtx(false),
       mSentSampleCount(0),
       mCudaWaiter(cudaDevice, cudaStream) {
-  gslog(
-      GSLOG_DEBUG,
+  gslogd(
       "Created AAC File writer. Output file [%s] sample rate [%d] bit rate [%d]",
       outputFileName,
       sampleRate,
@@ -275,9 +271,9 @@ AacFileWriter::~AacFileWriter() {
     try {
       SAFE_FF_ONLY_LOG(encodeAndMuxAvailable(true /* flush */, 0));
     } catch (exception& e) {
-      gslog(GSLOG_WARN, "Failed to flush AacFileWriter output: %s", e.what());
+      gslogw("Failed to flush AacFileWriter output: %s", e.what());
     } catch (...) {
-      gslog(GSLOG_WARN, "Unknown error flushing AacFileWriter.");
+      gslogw("Unknown error flushing AacFileWriter.");
     }
   }
 }
@@ -444,3 +440,9 @@ void AacFileWriter::rescalePacketFromCodecToContainerTime(const std::shared_ptr<
     pkt->duration = rescaleToContainerTime(mOutputPacket->duration);
   }
 }
+
+size_t AacFileWriter::preferredInputBufferSize(size_t port) noexcept {
+  GS_REQUIRE_OR_ABORT(port == 0, "Port is out of range");
+  return mAudioCodecInputBufferSize;
+}
+

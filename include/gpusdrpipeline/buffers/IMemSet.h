@@ -25,7 +25,7 @@
 
 class IMemSet : public virtual IRef {
  public:
-  virtual Status memSet(void* data, uint8_t value, size_t byteCount) noexcept = 0;
+  [[nodiscard]] virtual Status memSet(void* data, uint8_t value, size_t byteCount) noexcept = 0;
 
   ABSTRACT_IREF(IMemSet);
 };

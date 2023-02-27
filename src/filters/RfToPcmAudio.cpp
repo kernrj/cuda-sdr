@@ -51,8 +51,7 @@ static Status createLowPassTaps(
     const size_t bellangerTapCount = bellangerLowPassTapCount(sampleFrequency, transitionWidth, 0.01f, dbAttenuation);
     const size_t fredHarrisTapCount = fredHarrisLowPassTapCount(dbAttenuation, transitionWidth, sampleFrequency);
 
-    gslog(
-        GSLOG_DEBUG,
+    gslogd(
         "Sample rate [%f] cutoff [%f] transition [%f] Bellanger count [%zu] Fred Harris count [%zu]",
         sampleFrequency,
         cutoffFrequency,
@@ -159,17 +158,15 @@ Result<Filter> RfToPcmAudio::create(
       audioLowPassTransitionWidth,
       audioLowPassDbAttenuation));
 
-  gslog(GSLOG_DEBUG, "CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
-  gslog(
-      GSLOG_DEBUG,
+  gslogd("CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
+  gslogd(
       "Channel frequency [%f], center frequency [%f] channel width [%f]",
       channelFrequency,
       centerFrequency,
       channelWidth);
-  gslog(GSLOG_DEBUG, "RF sample rate [%f]", rfSampleRate);
-  gslog(GSLOG_DEBUG, "Audio sample rate [%ld]", lrint(audioSampleRate));
-  gslog(
-      GSLOG_DEBUG,
+  gslogd("RF sample rate [%f]", rfSampleRate);
+  gslogd("Audio sample rate [%ld]", lrint(audioSampleRate));
+  gslogd(
       "RF Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]",
       rfLowPassCutoffFrequency,
       rfLowPassTransitionWidth,
@@ -177,16 +174,15 @@ Result<Filter> RfToPcmAudio::create(
       rfLowPassDecim,
       rfLowPassTaps.size());
 
-  gslog(
-      GSLOG_DEBUG,
+  gslogd(
       "Audio Low-pass cutoff [%f] transition [%f] attenuation [%f] decimation [%zu] tap length [%zu]",
       audioLowPassCutoffFrequency,
       audioLowPassTransitionWidth,
       audioLowPassDbAttenuation,
       audioLowPassDecim,
       audioLowPassTaps.size());
-  gslog(GSLOG_DEBUG, "Cosine source frequency [%f]", centerFrequency - channelFrequency);
-  gslog(GSLOG_DEBUG, "Quad demod gain [%f]", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
+  gslogd("Cosine source frequency [%f]", centerFrequency - channelFrequency);
+  gslogd("Quad demod gain [%f]", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
 
   Ref<IFilterDriver> driver;
   UNWRAP_OR_FWD_RESULT(driver, factories->getFilterDriverFactory()->createFilterDriver());
@@ -247,12 +243,14 @@ Result<Filter> RfToPcmAudio::create(
   FWD_IN_RESULT_IF_ERR(driver->connect(rfLowPassFilter.get(), 0, quadDemodFilter.get(), 0));
   FWD_IN_RESULT_IF_ERR(driver->connect(quadDemodFilter.get(), 0, audioLowPassFilter.get(), 0));
 
-  driver->setupNode(multiplyWithOnlyPort0Exposed.get(), "Receive RF input, send to Multiply port 0");
-  driver->setupNode(cosineSource.get(), "Produce a cosine signal");
-  driver->setupNode(multiplyRfSourceByCosine.get(), "Multiply RF input by cosine");
-  driver->setupNode(rfLowPassFilter.get(), "Shift frequency with low-pass+decimate RF signal");
-  driver->setupNode(quadDemodFilter.get(), "Demodulate FM from Quadrature input");
-  driver->setupNode(audioLowPassFilter.get(), "Low-pass and decimate to output audio sample rate");
+  FWD_IN_RESULT_IF_ERR(
+      driver->setupNode(multiplyWithOnlyPort0Exposed.get(), "Receive RF input, send to Multiply port 0"));
+  FWD_IN_RESULT_IF_ERR(driver->setupNode(cosineSource.get(), "Produce a cosine signal"));
+  FWD_IN_RESULT_IF_ERR(driver->setupNode(multiplyRfSourceByCosine.get(), "Multiply RF input by cosine"));
+  FWD_IN_RESULT_IF_ERR(driver->setupNode(rfLowPassFilter.get(), "Shift frequency with low-pass+decimate RF signal"));
+  FWD_IN_RESULT_IF_ERR(driver->setupNode(quadDemodFilter.get(), "Demodulate FM from Quadrature input"));
+  FWD_IN_RESULT_IF_ERR(
+      driver->setupNode(audioLowPassFilter.get(), "Low-pass and decimate to output audio sample rate"));
 
   auto rfToPcmAudio = new (nothrow) RfToPcmAudio(
       driver.get(),
@@ -299,4 +297,8 @@ size_t RfToPcmAudio::getOutputSizeAlignment(size_t port) noexcept {
 
 Status RfToPcmAudio::readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept {
   return mDriver->readOutput(portOutputBuffers, numPorts);
+}
+
+size_t RfToPcmAudio::preferredInputBufferSize(size_t port) noexcept {
+  return 1 << 20;
 }

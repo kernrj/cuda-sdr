@@ -30,12 +30,13 @@ using OutputType = float;
 Result<Filter> QuadAmDemod::create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
-  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
 
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
       factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, 32, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
 
   return makeRefResultNonNull<Filter>(new (nothrow) QuadAmDemod(
       cudaDevice,
@@ -97,4 +98,8 @@ Status QuadAmDemod::readOutput(IBuffer** portOutputBuffers, size_t portCount) no
   FWD_IF_ERR(consumeInputBytesAndMoveUsedToStart(0, discardNumInputBytes));
 
   return Status_Success;
+}
+
+size_t QuadAmDemod::preferredInputBufferSize(size_t port) noexcept {
+  return 1 << 20;
 }

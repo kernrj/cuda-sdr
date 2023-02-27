@@ -40,9 +40,9 @@ class SteppingDriver final : public ISteppingDriver {
    * @param sinkPort
    * @param sourceOutputMemCopier Used when the source connect
    */
-  Status connect(Source* source, size_t sourcePort, Sink* sink, size_t sinkPort) noexcept final;
-  void setupNode(Node* node, const char* functionInGraph) noexcept final;
-  void setupSourcePort(Source* source, size_t sourcePort, const IBufferCopier* sourceOutputMemCopier) noexcept final;
+  [[nodiscard]] Status connect(Source* source, size_t sourcePort, Sink* sink, size_t sinkPort) noexcept final;
+  [[nodiscard]] Status setupNode(Node* node, const char* functionInGraph) noexcept final;
+  [[nodiscard]] Status setupSourcePort(Source* source, size_t sourcePort, const IBufferCopier* sourceOutputMemCopier) noexcept final;
 
   void iterateOverConnections(void* context, void (*connectionIterator)(
                                                  IDriver* driver,
@@ -60,7 +60,7 @@ class SteppingDriver final : public ISteppingDriver {
                                                                 const char* attrVal) noexcept) noexcept final;
   size_t getNodeName(Node* node, char* name, size_t nameBufLen, bool* foundOut) noexcept final;
 
-  Status doFilter() noexcept final;
+  [[nodiscard]] Status doFilter() noexcept final;
 
  private:
   struct SourceKey {
@@ -109,15 +109,15 @@ class SteppingDriver final : public ISteppingDriver {
   std::shared_ptr<SourcePortInfo> getOrCreateSourcePortInfo(const ImmutableRef<Source>& source, size_t port);
   std::shared_ptr<SourceConnectionInfo> getOrCreateSourceConnectionInfo(const ImmutableRef<Source>& source);
   std::shared_ptr<SinkConnectionInfo> getOrCreateSinkConnectionInfo(const ImmutableRef<Sink>& sink);
-  std::shared_ptr<SinkConnectionInfo> getSinkConnectionInfo(Sink* sink);
+  [[nodiscard]] std::shared_ptr<SinkConnectionInfo> getSinkConnectionInfo(Sink* sink);
   std::shared_ptr<NodeInfo> getOrCreateNodeInfo(const ImmutableRef<Node>& node);
-  std::shared_ptr<NodeInfo> getNodeInfo(Node* node);
+  [[nodiscard]] std::shared_ptr<NodeInfo> getNodeInfo(Node* node);
   std::string getLocalNodeName(Node* node);
 
-  Status ensureConnectable(const SinkKey& sinkInfo) noexcept;
-  Status doSinkInput(Sink* sink);
-  Status doSourceOutput(const ImmutableRef<Source>& source);
-  bool sourceHasDataForAllPorts(const ImmutableRef<Source>& source);
+  [[nodiscard]] Status ensureConnectable(const SinkKey& sinkInfo) noexcept;
+  [[nodiscard]] Status doSinkInput(Sink* sink);
+  [[nodiscard]] Status doSourceOutput(const ImmutableRef<Source>& source);
+  [[nodiscard]] bool sourceHasDataForAllPorts(const ImmutableRef<Source>& source);
 
   REF_COUNTED(SteppingDriver);
 };

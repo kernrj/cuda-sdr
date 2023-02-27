@@ -55,7 +55,7 @@ Status ResizableBuffer::resize(size_t newSize) noexcept {
     size_t copyNumBytes = originalCapacity;
     Ref<IMemory> newData;
     UNWRAP_OR_FWD_STATUS(newData, mAllocator->allocate(newSize));
-    FWD_IF_ERR(mBufferCopier->copy(newData.get(), base(), copyNumBytes));
+    FWD_IF_ERR(mBufferCopier->copy(newData->data(), base(), copyNumBytes));
 
     mRange->setCapacity(newData->capacity());
     mData = newData;

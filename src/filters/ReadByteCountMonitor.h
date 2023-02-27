@@ -31,7 +31,8 @@ class ReadByteCountMonitor final : public IReadByteCountMonitor {
   [[nodiscard]] Status commitBuffer(size_t port, size_t byteCount) noexcept final;
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
-  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
+  [[nodiscard]] Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
+  [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final;
 
  private:
   ConstRef<Filter> mFilter;

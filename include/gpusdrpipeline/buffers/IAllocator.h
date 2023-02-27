@@ -35,7 +35,7 @@ class IAllocator : public virtual IRef {
    * @param size The minimum size of the buffer. Must be > 0. Some implementations may return larger buffers (e.g.
    *             padding for compatibility with vectorized operations).
    */
-  virtual Result<IMemory> allocate(size_t size) noexcept = 0;
+  [[nodiscard]] virtual Result<IMemory> allocate(size_t size) noexcept = 0;
 
   ABSTRACT_IREF(IAllocator);
 };

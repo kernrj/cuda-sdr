@@ -23,7 +23,7 @@
 
 class IResizable : public virtual IRef {
  public:
-  virtual Status resize(size_t newSize) noexcept = 0;
+  [[nodiscard]] virtual Status resize(size_t newSize) noexcept = 0;
 
   ABSTRACT_IREF(IResizable);
 };

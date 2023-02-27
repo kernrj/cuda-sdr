@@ -121,7 +121,7 @@ Status SteppingDriver::connect(Source* source, size_t sourcePort, Sink* sink, si
   }
   sinkConnectionInfo->connectedSources.emplace_back(source, sourcePort);
 
-  auto it = sinkConnectionInfo->connectedSources.begin() + sinkPort;
+  auto it = sinkConnectionInfo->connectedSources.begin() + static_cast<int>(sinkPort);
   sinkConnectionInfo->connectedSources.emplace(it, source, sourcePort);
 
   if (source->asSink() != nullptr) {
@@ -135,15 +135,18 @@ Status SteppingDriver::connect(Source* source, size_t sourcePort, Sink* sink, si
   return Status_Success;
 }
 
-void SteppingDriver::setupNode(Node* node, const char* functionInGraph) noexcept {
-  getOrCreateNodeInfo(node)->name = functionInGraph;
+Status SteppingDriver::setupNode(Node* node, const char* functionInGraph) noexcept {
+  DO_OR_RET_STATUS(getOrCreateNodeInfo(node)->name = functionInGraph);
+
+  return Status_Success;
 }
 
-void SteppingDriver::setupSourcePort(
+Status SteppingDriver::setupSourcePort(
     Source* source,
     size_t sourcePort,
     const IBufferCopier* sourceOutputMemCopier) noexcept {
-  const auto connectionInfo = getOrCreateSourcePortInfo(source, sourcePort)->memCopier = sourceOutputMemCopier;
+  DO_OR_RET_STATUS(getOrCreateSourcePortInfo(source, sourcePort)->memCopier = sourceOutputMemCopier);
+  return Status_Success;
 }
 
 void SteppingDriver::iterateOverConnections(
@@ -178,9 +181,9 @@ void SteppingDriver::iterateOverNodes(
 }
 
 void SteppingDriver::iterateOverNodeAttributes(
-    Node* node,
-    void* context,
-    void (*nodeAttrIterator)(
+    [[maybe_unused]] Node* node,
+    [[maybe_unused]] void* context,
+    [[maybe_unused]] void (*nodeAttrIterator)(
         IDriver* driver,
         Node* node,
         void* context,
@@ -198,12 +201,7 @@ void SteppingDriver::iterateOverNodeAttributes(
  */
 Status SteppingDriver::doFilter() noexcept {
   for (auto& sink : mGraphTails) {
-    DO_OR_RET_STATUS({
-      Status status = doSinkInput(sink);
-      if (status != Status_Success) {
-        return status;
-      }
-    });
+    DO_OR_RET_STATUS(FWD_IF_ERR(doSinkInput(sink)));
   }
 
   return Status_Success;
@@ -212,7 +210,7 @@ Status SteppingDriver::doFilter() noexcept {
 Status SteppingDriver::doSinkInput(Sink* sink) {
   auto sinkConnectionInfo = getSinkConnectionInfo(sink);
   if (sinkConnectionInfo == nullptr) {
-    // cerr << "Requested Sink [" << getNodeName(sink) << "] input, but it has no connection info" << endl;
+    // The sink needs to be populated elsewhere (e.g. A FilterDriver input sink isn't connected in this driver)
     return Status_Success;
   }
 
@@ -221,22 +219,21 @@ Status SteppingDriver::doSinkInput(Sink* sink) {
     const string sourceName = getLocalNodeName(connection.source.get());
 
     if (connection.source == nullptr) {
-      gslog(GSLOG_TRACE, "Sink [%s] does not have a Source connected it.", sinkName.c_str());
+      gslogt("Sink [%s] does not have a Source connected it.", sinkName.c_str());
       continue;
     }
 
-    gslog(GSLOG_TRACE, "Found [%s] -> [%s]", sourceName.c_str(), sinkName.c_str());
+    gslogt("Found [%s] -> [%s]", sourceName.c_str(), sinkName.c_str());
 
     const bool sourceIsSink = connection.source->asSink();
 
     while (sourceIsSink && !sourceHasDataForAllPorts(connection.source)) {
-      gslog(GSLOG_TRACE, "[%s] needs data - fetching", sourceName.c_str());
+      gslogt("[%s] needs data - fetching", sourceName.c_str());
 
-      doSinkInput(connection.source->asSink());
+      FWD_IF_ERR(doSinkInput(connection.source->asSink()));
 
       if (!sourceHasDataForAllPorts(connection.source)) {
-        gslog(
-            GSLOG_TRACE,
+        gslogt(
             "[%s] did not produce output on all ports after requesting input for it",
             sourceName.c_str());
 
@@ -245,17 +242,16 @@ Status SteppingDriver::doSinkInput(Sink* sink) {
     }
 
     if (!sourceIsSink) {
-      gslog(GSLOG_TRACE, "[%s] is not a sink, not back-propagating", sourceName.c_str());
+      gslogt("[%s] is not a sink, not back-propagating", sourceName.c_str());
     }
 
     if (sourceHasDataForAllPorts(connection.source)) {
-      gslog(
-          GSLOG_TRACE,
+      gslogt(
           "[%s] has data for all output ports [%zu]",
           sourceName.c_str(),
           connection.source->getOutputDataSize(0));
 
-      doSourceOutput(connection.source);
+      FWD_IF_ERR(doSourceOutput(connection.source));
     }
   }
 
@@ -266,7 +262,10 @@ Status SteppingDriver::doSourceOutput(const ImmutableRef<Source>& source) {
   const auto connectionInfo = getOrCreateSourceConnectionInfo(source);
   const string sourceName = getLocalNodeName(connectionInfo->source.get());
 
-  gslog(GSLOG_TRACE, "doSourceOutput for [%s]", sourceName.c_str());
+  gslogt("doSourceOutput for [%s]", sourceName.c_str());
+
+  // hold onto refs so the buffer slices don't get destroyed
+  vector<Ref<IBuffer>> bufferRefs;
 
   vector<IBuffer*> sourceOutputBuffers(connectionInfo->connections.size());
 
@@ -284,13 +283,18 @@ Status SteppingDriver::doSourceOutput(const ImmutableRef<Source>& source) {
       const auto sink = sinkKey.sink;
       const size_t sinkPort = sinkKey.port;
 
-      if (sink == nullptr) {
-        GS_FAIL(
-            "Source [" << getLocalNodeName(source.get()) << "] must have a sink connected to port [" << sourcePort
-                       << "]");
+      GS_REQUIRE_OR_RET_FMT(
+          sink != nullptr,
+          Status_RuntimeError,
+          "Source [%s] must have a sink connected to port [%zu]",
+          getLocalNodeName(source.get()).c_str(),
+          sourcePort);
+
+      size_t alignment = source->getOutputSizeAlignment(sourcePort);
+      if (alignment == 0) {
+        alignment = 1;
       }
 
-      const size_t alignment = source->getOutputSizeAlignment(sinkPort);
       const size_t sinkPreferredInputSize = sink->preferredInputBufferSize(sinkPort);
       const size_t sourceAvailableOutputSize = source->getOutputDataSize(sourcePort);
       const size_t bufferSize =
@@ -302,16 +306,14 @@ Status SteppingDriver::doSourceOutput(const ImmutableRef<Source>& source) {
 #ifdef DEBUG
       const string sinkName = getLocalNodeName(sink);
 
-      gslog(
-          GSLOG_TRACE,
+      gslogt(
           "Requested buffer of size [%zu] from [%s] and got [%zu]",
           bufferSize,
           sinkName.c_str(),
           sinkBuffer->range()->remaining());
 
       if (sinkBuffer->range()->used() > 0) {
-        gslog(
-            GSLOG_TRACE,
+        gslogt(
             "Unexpected data in sink [%s] input buffer, size [%zu]",
             sinkName.c_str(),
             sinkBuffer->range()->remaining());
@@ -320,8 +322,10 @@ Status SteppingDriver::doSourceOutput(const ImmutableRef<Source>& source) {
 
       if (sourceOutputBuffers[sourcePort] == nullptr) {
         sourceOutputBuffers[sourcePort] = sinkBuffer.get();
+        bufferRefs.push_back(sinkBuffer);
       } else {
         extraBuffersCopiedInto[sourcePort].push_back(sinkBuffer.get());
+        bufferRefs.push_back(sinkBuffer);
       }
     }
   }
@@ -330,14 +334,14 @@ Status SteppingDriver::doSourceOutput(const ImmutableRef<Source>& source) {
 
   for (size_t sourcePort = 0; sourcePort < connectionInfo->connections.size(); sourcePort++) {
     auto& connection = connectionInfo->connections[sourcePort];
-    const auto& sinksConnectedToUpstreamSource = connection.connectedSinks;
 
 #ifdef DEBUG
+    const auto& sinksConnectedToUpstreamSource = connection.connectedSinks;
+
     for (auto& sinkKey : sinksConnectedToUpstreamSource) {
       const auto sinkName = getLocalNodeName(sinkKey.sink);
 
-      gslog(
-          GSLOG_TRACE,
+      gslogt(
           "[%s|%zu] -> [%s|%zu] num bytes [%zu]",
           sourceName.c_str(),
           sourcePort,
@@ -345,8 +349,8 @@ Status SteppingDriver::doSourceOutput(const ImmutableRef<Source>& source) {
           sinkKey.port,
           sourceOutputBuffers[sourcePort]->range()->used());
     }
-  }
 #endif  // DEBUG
+  }
 
   for (size_t sourcePort = 0; sourcePort < sourceOutputBuffers.size(); sourcePort++) {
     auto populatedBuffer = sourceOutputBuffers[sourcePort];
@@ -357,8 +361,7 @@ Status SteppingDriver::doSourceOutput(const ImmutableRef<Source>& source) {
       const auto& memCopier = connectionInfo->connections[sourcePort].memCopier;
 
       if (memCopier == nullptr) {
-        gslog(
-            GSLOG_ERROR,
+        gsloge(
             "Source [%s] has multiple outgoing connections form port [%zu], but a copier hasn't been setup. Call "
             "setupSourcePort() to configure.",
             getLocalNodeName(source).c_str(),
@@ -452,8 +455,7 @@ Status SteppingDriver::ensureConnectable(const SinkKey& sinkInfo) noexcept {
   if (sinkInfo.port < connectedSources.size() && connectedSources[sinkInfo.port].source != nullptr) {
     const auto& source = connectedSources[sinkInfo.port].source;
     const size_t sourcePort = connectedSources[sinkInfo.port].port;
-    gslog(
-        GSLOG_ERROR,
+    gsloge(
         "Sink [%s] port [%zu] is already connected to Source [%s] port [%zu]",
         getLocalNodeName(sinkInfo.sink).c_str(),
         sinkInfo.port,

@@ -63,7 +63,10 @@ Status RelocatableResizableBuffer::resize(size_t newSize) noexcept {
     FWD_IF_ERR(newDataResult.status);
     ConstRef<IMemory> newData = newDataResult.value;
 
-    FWD_IF_ERR(mBufferCopier->copy(newData.get(), base(), copyNumBytes));
+    if (mData != nullptr) {
+      FWD_IF_ERR(mBufferCopier->copy(newData->data(), mData->data(), copyNumBytes));
+    }
+
     UNWRAP_OR_FWD_STATUS(mDataCopy, mAllocator->allocate(newData->capacity()));
 
     mRange->setCapacity(newData->capacity());
@@ -90,7 +93,7 @@ Status RelocatableResizableBuffer::relocate(size_t dstOffset, size_t srcOffset, 
       capacity);
 
   if (length > 0) {
-    FWD_IF_ERR(mBufferCopier->copy(mDataCopy.get() + dstOffset, mData.get() + srcOffset, length));
+    FWD_IF_ERR(mBufferCopier->copy(mDataCopy->data() + dstOffset, mData->data() + srcOffset, length));
     std::swap(mData, mDataCopy);
   }
 

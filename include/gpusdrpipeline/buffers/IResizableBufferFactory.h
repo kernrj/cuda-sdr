@@ -23,7 +23,7 @@
 
 class IResizableBufferFactory : public virtual IRef {
  public:
-  virtual Result<IResizableBuffer> createResizableBuffer(size_t size) noexcept = 0;
+  [[nodiscard]] virtual Result<IResizableBuffer> createResizableBuffer(size_t size) noexcept = 0;
 
   ABSTRACT_IREF(IResizableBufferFactory);
 };

@@ -22,7 +22,7 @@
 
 class IResizableBuffer : public IBuffer, public IResizable {
  public:
-  Status ensureMinSize(size_t minSize) noexcept {
+  [[nodiscard]] Status ensureMinSize(size_t minSize) noexcept {
     if (range()->capacity() < minSize) {
       return resize(minSize);
     }

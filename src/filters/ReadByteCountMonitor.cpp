@@ -60,3 +60,7 @@ Status ReadByteCountMonitor::readOutput(IBuffer** portOutputBuffers, size_t numP
 
   return Status_Success;
 }
+
+size_t ReadByteCountMonitor::preferredInputBufferSize(size_t port) noexcept {
+  return mFilter->preferredInputBufferSize(port);
+}

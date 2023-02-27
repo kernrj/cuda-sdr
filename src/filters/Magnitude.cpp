@@ -28,12 +28,13 @@ const size_t Magnitude::mAlignment = 32;
 Result<Filter> Magnitude::create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
-  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
 
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
       factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
 
   return makeRefResultNonNull<Filter>(new (nothrow) Magnitude(
       cudaDevice,
@@ -97,3 +98,5 @@ Status Magnitude::readOutput(IBuffer** portOutputBuffers, size_t portCount) noex
 
   return Status_Success;
 }
+
+size_t Magnitude::preferredInputBufferSize(size_t port) noexcept { return 1 << 20; }

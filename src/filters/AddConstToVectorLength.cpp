@@ -33,12 +33,13 @@ Result<Filter> AddConstToVectorLength::create(
     IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
-  ConstRef<IMemSet> memSet = factories->getSysMemSet();
+  Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
 
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
       factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
 
   return makeRefResultNonNull<Filter>(new (nothrow) AddConstToVectorLength(
       addValueToMagnitude,
@@ -46,7 +47,7 @@ Result<Filter> AddConstToVectorLength::create(
       cudaStream,
       relocatableCudaBufferFactory.get(),
       bufferSliceFactory,
-      memSet));
+      memSet.get()));
 }
 
 AddConstToVectorLength::AddConstToVectorLength(
@@ -102,4 +103,9 @@ Status AddConstToVectorLength::readOutput(IBuffer** portOutputBuffers, size_t po
   FWD_IF_ERR(consumeInputBytesAndMoveUsedToStart(0, writtenNumBytes));
 
   return Status_Success;
+}
+
+size_t AddConstToVectorLength::preferredInputBufferSize(size_t port) noexcept {
+  GS_REQUIRE_OR_RET_FMT(port == 0, Status_InvalidArgument, "Max port is 0, but port [%zu] was requested", port);
+  return (1 << 20) * sizeof(cuComplex);
 }

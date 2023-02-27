@@ -52,10 +52,15 @@ class BufferSlice final : public IBuffer {
   const size_t mSliceStart;
 
  private:
-  BufferSlice(
-      IBuffer* slicedBuffer,
+  BufferSlice(IBuffer* slicedBuffer, size_t sliceStart, IBufferRange* bufferRange) noexcept;
+
+  static void getSliceOffsetsFromOriginal(
+      size_t originalOffset,
+      size_t originalEndOffset,
       size_t sliceStart,
-      IBufferRange* bufferRange) noexcept;
+      size_t sliceEnd,
+      size_t* newSliceOffsetOut,
+      size_t* newSliceEndOffsetOut) noexcept;
 
   REF_COUNTED(BufferSlice);
 };

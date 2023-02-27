@@ -22,8 +22,7 @@
 
 Status SysMemBufferCopier::copy(void* dst, const void* src, size_t length) const noexcept {
   if (length > 0 && (dst == nullptr || src == nullptr)) {
-    gslog(
-        GSLOG_ERROR,
+    gsloge(
         "Cannot copy system memory: the source [%p] and destination [%p] must be non-null when length [%zu] > 0",
         src,
         dst,

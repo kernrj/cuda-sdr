@@ -38,7 +38,7 @@ class CosineSourceFactory final : public ICosineSourceFactory {
         return makeRefResultNonNull<Source>(new (std::nothrow) CosineSource(sampleRate, frequency, cudaDevice, cudaStream));
 
       default:
-        gslog(GSLOG_ERROR, "Sample type [%u] is not supported for cosine", sampleType);
+        gsloge("Sample type [%u] is not supported for cosine", sampleType);
         return ERR_RESULT(Status_InvalidArgument);
     }
   }

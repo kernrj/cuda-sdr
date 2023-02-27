@@ -75,14 +75,14 @@ class DriverTool {
   };
 
  private:
-  static void iterateOverNodesCallback(IDriver* driver, void* context, Node* node) noexcept {
+  static void iterateOverNodesCallback([[maybe_unused]] IDriver* driver, void* context, Node* node) noexcept {
     auto getNodesContext = reinterpret_cast<GetNodesContext*>(context);
     getNodesContext->nodes.push_back(node);
   }
 
   static void iterateOverNodeAttributesCallback(
-      IDriver* driver,
-      Node* node,
+      [[maybe_unused]] IDriver* driver,
+      [[maybe_unused]] Node* node,
       void* context,
       const char* attrName,
       const char* attrVal) noexcept {
@@ -91,7 +91,7 @@ class DriverTool {
   }
 
   static void iterateOverConnectionsCallback(
-      IDriver* driver,
+      [[maybe_unused]] IDriver* driver,
       void* context,
       Source* source,
       size_t sourcePort,

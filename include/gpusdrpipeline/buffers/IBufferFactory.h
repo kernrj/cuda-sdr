@@ -25,7 +25,7 @@
 
 class IBufferFactory : public virtual IRef {
  public:
-  virtual Result<IBuffer> createBuffer(size_t size) noexcept = 0;
+  [[nodiscard]] virtual Result<IBuffer> createBuffer(size_t size) noexcept = 0;
 
   ABSTRACT_IREF(IBufferFactory);
 };

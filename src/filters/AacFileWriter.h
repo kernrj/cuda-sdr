@@ -42,6 +42,7 @@ class AacFileWriter final : public BaseSink {
 
   [[nodiscard]] Result<IBuffer> requestBuffer(size_t port, size_t numBytes) noexcept final;
   [[nodiscard]] Status commitBuffer(size_t port, size_t numBytes) noexcept final;
+  [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final;
 
  private:
   const std::string mOutputFileName;

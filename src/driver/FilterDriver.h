@@ -29,9 +29,10 @@ class FilterDriver final : public IFilterDriver {
   void setDriverInput(Sink* sink) noexcept final;
   void setDriverOutput(Source* source) noexcept final;
 
-  Status connect(Source* source, size_t sourcePort, Sink* sink, size_t sinkPort) noexcept final;
-  void setupNode(Node* node, const char* functionInGraph) noexcept final;
-  void setupSourcePort(Source* source, size_t sourcePort, const IBufferCopier* sourceOutputMemCopier) noexcept final;
+  [[nodiscard]] Status connect(Source* source, size_t sourcePort, Sink* sink, size_t sinkPort) noexcept final;
+  [[nodiscard]] Status setupNode(Node* node, const char* functionInGraph) noexcept final;
+  [[nodiscard]] Status setupSourcePort(Source* source, size_t sourcePort, const IBufferCopier* sourceOutputMemCopier) noexcept final;
+  [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final;
 
   void iterateOverConnections(
       void* context,
@@ -59,7 +60,7 @@ class FilterDriver final : public IFilterDriver {
   [[nodiscard]] Status commitBuffer(size_t port, size_t byteCount) noexcept final;
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
-  Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
+  [[nodiscard]] Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
   size_t getNodeName(Node* node, char* name, size_t nameBufLen, bool* foundOut) noexcept final;
 
  private:

@@ -38,8 +38,7 @@ Result<IMemory> CudaAllocator::allocate(size_t size) noexcept {
   }
 
   const char* memoryType = mUseHostMemory ? "host" : "GPU";
-  gslog(
-      GSLOG_DEBUG,
+  gslogd(
       "CUDA [%s] memory allocation. Size [%zd] alignment [%zd] stream [%p]",
       memoryType,
       size,
@@ -47,7 +46,7 @@ Result<IMemory> CudaAllocator::allocate(size_t size) noexcept {
       mCudaStream);
 
   if (size > INT64_MAX) {
-    gslog(GSLOG_ERROR, "Buffer size [%zu] is too large", size);
+    gsloge("Buffer size [%zu] is too large", size);
     return ERR_RESULT(Status_InvalidArgument);
   }
 
@@ -66,17 +65,13 @@ Result<IMemory> CudaAllocator::allocate(size_t size) noexcept {
     deleter = cudaGpuMemDeleter;
   }
 
-  if (cudaAllocResult != cudaSuccess) {
-    gslog(
-        GSLOG_ERROR,
-        "Failed to allocate CUDA memory with size [%zu] on GPU [%d] stream [%p] host memory? [%d]",
-        allocSize,
-        mCudaDevice,
-        mCudaStream,
-        mUseHostMemory);
-
-    return ERR_RESULT(Status_OutOfMemory);
-  }
+  GS_REQUIRE_OR_RET_RESULT_FMT(
+      cudaAllocResult == cudaSuccess,
+      "Failed to allocate CUDA memory with size [%zu] on GPU [%d] stream [%p] host memory? [%d]",
+      allocSize,
+      mCudaDevice,
+      mCudaStream,
+      mUseHostMemory);
 
   auto startAddress =
       reinterpret_cast<uint8_t*>(reinterpret_cast<intptr_t>(rawBuffer + mAlignment - 1) / mAlignment * mAlignment);
@@ -87,8 +82,8 @@ Result<IMemory> CudaAllocator::allocate(size_t size) noexcept {
 }
 
 void CudaAllocator::cudaHostMemDeleter(
-    [[maybe_unused]] uint8_t* alignedAddress, // Not used when freeing. Base address (context) is used.
-    void* context,  // Start-address of the allocated memory. alignedAddress can be greater.
+    [[maybe_unused]] uint8_t* alignedAddress,  // Not used when freeing. Base address (context) is used.
+    void* context,                             // Start-address of the allocated memory. alignedAddress can be greater.
     int32_t cudaDevice,
     cudaStream_t cudaStream) noexcept {
   void* startAddress = context;
@@ -99,8 +94,8 @@ void CudaAllocator::cudaHostMemDeleter(
 }
 
 void CudaAllocator::cudaGpuMemDeleter(
-    [[maybe_unused]] uint8_t* alignedAddress, // Not used when freeing. Base address (context) is used.
-    void* context,  // Start-address of the allocated memory. alignedAddress can be greater.
+    [[maybe_unused]] uint8_t* alignedAddress,  // Not used when freeing. Base address (context) is used.
+    void* context,                             // Start-address of the allocated memory. alignedAddress can be greater.
     int32_t cudaDevice,
     cudaStream_t cudaStream) noexcept {
   void* startAddress = context;
