@@ -48,18 +48,8 @@ struct ValResult {
 };
 #pragma pack(pop)
 
-#pragma pack(push, 8)
-struct Int32Result {
-  Status status;
-  int32_t value;
-};
-#pragma pack(pop)
-
 template <typename T>
-using Result = typename std::conditional<
-    std::is_base_of<IRef, T>::value,
-    RefResult<T>,
-    typename std::conditional<std::is_same<int32_t, T>::value, Int32Result, ValResult<T>>::type>::type;
+using Result = typename std::conditional<std::is_base_of<IRef, T>::value, RefResult<T>, ValResult<T>>::type;
 
 /**
  * Returns the value from the result, or throws an exception on error (unreffing the result).
