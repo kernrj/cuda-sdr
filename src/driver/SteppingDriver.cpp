@@ -233,9 +233,7 @@ Status SteppingDriver::doSinkInput(Sink* sink) {
       FWD_IF_ERR(doSinkInput(connection.source->asSink()));
 
       if (!sourceHasDataForAllPorts(connection.source)) {
-        gslogt(
-            "[%s] did not produce output on all ports after requesting input for it",
-            sourceName.c_str());
+        gslogt("[%s] did not produce output on all ports after requesting input for it", sourceName.c_str());
 
         return Status_Success;
       }
@@ -246,10 +244,7 @@ Status SteppingDriver::doSinkInput(Sink* sink) {
     }
 
     if (sourceHasDataForAllPorts(connection.source)) {
-      gslogt(
-          "[%s] has data for all output ports [%zu]",
-          sourceName.c_str(),
-          connection.source->getOutputDataSize(0));
+      gslogt("[%s] has data for all output ports [%zu]", sourceName.c_str(), connection.source->getOutputDataSize(0));
 
       FWD_IF_ERR(doSourceOutput(connection.source));
     }

@@ -22,14 +22,23 @@
 
 class IBufferUtil : public virtual IRef {
  public:
-  [[nodiscard]] virtual Status appendToBuffer(IBuffer* buffer, const void* src, size_t count, const IBufferCopier* bufferCopier)
-      const noexcept = 0;
+  [[nodiscard]] virtual Status appendToBuffer(
+      IBuffer* buffer,
+      const void* src,
+      size_t count,
+      const IBufferCopier* bufferCopier) const noexcept = 0;
 
-  [[nodiscard]] virtual Status readFromBuffer(void* dst, IBuffer* buffer, size_t count, const IBufferCopier* bufferCopier)
-      const noexcept = 0;
+  [[nodiscard]] virtual Status readFromBuffer(
+      void* dst,
+      IBuffer* buffer,
+      size_t count,
+      const IBufferCopier* bufferCopier) const noexcept = 0;
 
-  [[nodiscard]] virtual Status moveFromBuffer(IBuffer* dst, IBuffer* src, size_t count, const IBufferCopier* bufferCopier)
-      const noexcept = 0;
+  [[nodiscard]] virtual Status moveFromBuffer(
+      IBuffer* dst,
+      IBuffer* src,
+      size_t count,
+      const IBufferCopier* bufferCopier) const noexcept = 0;
 
   ABSTRACT_IREF(IBufferUtil);
 };

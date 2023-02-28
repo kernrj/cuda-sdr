@@ -90,74 +90,73 @@ T unwrap(ValResult<T>&& result) {
   return result.value;
 }
 
-#define UNWRAP_OR_FWD_RESULT(assignValueToVar__, unwrapCmd__)                                \
-  do {                                                                                       \
-    auto result__ = unwrapCmd__;                                                             \
-    if (result__.status != Status_Success) {                                                 \
+#define UNWRAP_OR_FWD_RESULT(assignValueToVar__, unwrapCmd__)                    \
+  do {                                                                           \
+    auto result__ = unwrapCmd__;                                                 \
+    if (result__.status != Status_Success) {                                     \
       gsloge("Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
-      return {                                                                               \
-          .status = result__.status,                                                         \
-          .value = {},                                                                       \
-      };                                                                                     \
-    }                                                                                        \
-                                                                                             \
-    assignValueToVar__ = result__.value;                                                     \
+      return {                                                                   \
+          .status = result__.status,                                             \
+          .value = {},                                                           \
+      };                                                                         \
+    }                                                                            \
+                                                                                 \
+    assignValueToVar__ = result__.value;                                         \
   } while (false)
 
-#define WARN_IF_ERR(cmdReturningStatus__)                                       \
-  do {                                                                         \
-    const Status status__ = cmdReturningStatus__;                              \
-    if (status__ != Status_Success) {                                          \
+#define WARN_IF_ERR(cmdReturningStatus__)                          \
+  do {                                                             \
+    const Status status__ = cmdReturningStatus__;                  \
+    if (status__ != Status_Success) {                              \
       gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
-    }                                                                          \
+    }                                                              \
   } while (false)
 
-
-#define FWD_IF_ERR(cmdReturningStatus__)                                       \
-  do {                                                                         \
-    const Status status__ = cmdReturningStatus__;                              \
-    if (status__ != Status_Success) {                                          \
+#define FWD_IF_ERR(cmdReturningStatus__)                           \
+  do {                                                             \
+    const Status status__ = cmdReturningStatus__;                  \
+    if (status__ != Status_Success) {                              \
       gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
-      return status__;                                                         \
-    }                                                                          \
+      return status__;                                             \
+    }                                                              \
   } while (false)
 
-#define THROW_IF_ERR(cmdReturningStatus__)                                     \
-  do {                                                                         \
-    const Status status__ = cmdReturningStatus__;                              \
-    if (status__ != Status_Success) {                                          \
+#define THROW_IF_ERR(cmdReturningStatus__)                         \
+  do {                                                             \
+    const Status status__ = cmdReturningStatus__;                  \
+    if (status__ != Status_Success) {                              \
       gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
-      throwIfError(status__);                                                  \
-    }                                                                          \
+      throwIfError(status__);                                      \
+    }                                                              \
   } while (false)
 
-#define RET_IF_ERR(cmdReturningStatus__, returnValueOnErr__)                   \
-  do {                                                                         \
-    const Status status__ = cmdReturningStatus__;                              \
-    if (status__ != Status_Success) {                                          \
+#define RET_IF_ERR(cmdReturningStatus__, returnValueOnErr__)       \
+  do {                                                             \
+    const Status status__ = cmdReturningStatus__;                  \
+    if (status__ != Status_Success) {                              \
       gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
-      return returnValueOnErr__;                                               \
-    }                                                                          \
+      return returnValueOnErr__;                                   \
+    }                                                              \
   } while (false)
 
-#define FWD_IN_RESULT_IF_ERR(cmdReturningStatus__)                             \
-  do {                                                                         \
-    const Status status__ = cmdReturningStatus__;                              \
-    if (status__ != Status_Success) {                                          \
+#define FWD_IN_RESULT_IF_ERR(cmdReturningStatus__)                 \
+  do {                                                             \
+    const Status status__ = cmdReturningStatus__;                  \
+    if (status__ != Status_Success) {                              \
       gsloge("Error [%d] at %s:%d", status__, __FILE__, __LINE__); \
-      return {.status = status__, .value = {}};                                \
-    }                                                                          \
+      return {.status = status__, .value = {}};                    \
+    }                                                              \
   } while (false)
 
-#define UNWRAP_OR_FWD_STATUS(assignValueToVar__, unwrapCmd__)                                \
-  do {                                                                                       \
-    auto result__ = unwrapCmd__;                                                             \
-    if (result__.status != Status_Success) {                                                 \
+#define UNWRAP_OR_FWD_STATUS(assignValueToVar__, unwrapCmd__)                    \
+  do {                                                                           \
+    auto result__ = unwrapCmd__;                                                 \
+    if (result__.status != Status_Success) {                                     \
       gsloge("Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
-      return result__.status;                                                                \
-    }                                                                                        \
-                                                                                             \
-    assignValueToVar__ = result__.value;                                                     \
+      return result__.status;                                                    \
+    }                                                                            \
+                                                                                 \
+    assignValueToVar__ = result__.value;                                         \
   } while (false)
 
 template <class T>
@@ -173,58 +172,58 @@ inline bool printIfError(Result<T>&& result, GS_FMT_STR(const char* fmt), ...) n
   return std::move(result.value);
 }
 
-#define UNWRAP_OR_RETURN(assignValueToVar__, unwrapCmd__, retOnError__)                                            \
-  do {                                                                                                             \
-    auto result__ = unwrapCmd__;                                                                                   \
-    if (result__.status != Status_Success) {                                                                       \
+#define UNWRAP_OR_RETURN(assignValueToVar__, unwrapCmd__, retOnError__)                                \
+  do {                                                                                                 \
+    auto result__ = unwrapCmd__;                                                                       \
+    if (result__.status != Status_Success) {                                                           \
       gsloge("Error [%d] in result [%s] at %s:%d", result__.status, #unwrapCmd__, __FILE__, __LINE__); \
-      return retOnError__;                                                                                         \
-    }                                                                                                              \
-    assignValueToVar__ = result__.value;                                                                           \
+      return retOnError__;                                                                             \
+    }                                                                                                  \
+    assignValueToVar__ = result__.value;                                                               \
   } while (false)
 
-#define DO_OR_FWD_ERR(unwrapCmd__)                                                           \
-  do {                                                                                       \
-    auto result__ = unwrapCmd__;                                                             \
-    if (result__.status != Status_Success) {                                                 \
+#define DO_OR_FWD_ERR(unwrapCmd__)                                               \
+  do {                                                                           \
+    auto result__ = unwrapCmd__;                                                 \
+    if (result__.status != Status_Success) {                                     \
       gsloge("Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
-      return {                                                                               \
-          .status = result__.status,                                                         \
-          .value = {},                                                                       \
-      };                                                                                     \
-    }                                                                                        \
+      return {                                                                   \
+          .status = result__.status,                                             \
+          .value = {},                                                           \
+      };                                                                         \
+    }                                                                            \
   } while (false)
 
-#define NON_NULL_OR_RET(ptr__)                                                        \
-  do {                                                                                \
-    auto ptrVar__ = ptr__;                                                            \
-    if (ptrVar__ == nullptr) {                                                        \
+#define NON_NULL_OR_RET(ptr__)                                            \
+  do {                                                                    \
+    auto ptrVar__ = ptr__;                                                \
+    if (ptrVar__ == nullptr) {                                            \
       gsloge("%s cannot be null - at %s:%d", #ptr__, __FILE__, __LINE__); \
-      return ERR_RESULT(Status_OutOfMemory);                                          \
-    }                                                                                 \
+      return ERR_RESULT(Status_OutOfMemory);                              \
+    }                                                                     \
   } while (false)
 
-#define NON_NULL_PARAM_OR_RET(ptr__)                                                  \
-  do {                                                                                \
-    auto ptrVar__ = ptr__;                                                            \
-    if (ptrVar__ == nullptr) {                                                        \
+#define NON_NULL_PARAM_OR_RET(ptr__)                                      \
+  do {                                                                    \
+    auto ptrVar__ = ptr__;                                                \
+    if (ptrVar__ == nullptr) {                                            \
       gsloge("%s cannot be null - at %s:%d", #ptr__, __FILE__, __LINE__); \
-      return ERR_RESULT(Status_InvalidArgument);                                      \
-    }                                                                                 \
+      return ERR_RESULT(Status_InvalidArgument);                          \
+    }                                                                     \
   } while (false)
 
-#define RET_PTR_OR_ERR(cmd__, ptr__)                                                  \
-  do {                                                                                \
-    auto ptrVal__ = ptr__;                                                            \
-    if (ptrVar__ == nullptr) {                                                        \
+#define RET_PTR_OR_ERR(cmd__, ptr__)                                      \
+  do {                                                                    \
+    auto ptrVal__ = ptr__;                                                \
+    if (ptrVar__ == nullptr) {                                            \
       gsloge("%s cannot be null - at %s:%d", #ptr__, __FILE__, __LINE__); \
-      return ERR_RESULT(Status_OutOfMemory);                                          \
-    }                                                                                 \
-                                                                                      \
-    return {                                                                          \
-        .status = Status_Success,                                                     \
-        .value = ptrVal__,                                                            \
-    };                                                                                \
+      return ERR_RESULT(Status_OutOfMemory);                              \
+    }                                                                     \
+                                                                          \
+    return {                                                              \
+        .status = Status_Success,                                         \
+        .value = ptrVal__,                                                \
+    };                                                                    \
   } while (false)
 
 #define DO_OR_RET_ERR_RESULT(doCmd__)                \

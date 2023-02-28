@@ -42,22 +42,32 @@ class SteppingDriver final : public ISteppingDriver {
    */
   [[nodiscard]] Status connect(Source* source, size_t sourcePort, Sink* sink, size_t sinkPort) noexcept final;
   [[nodiscard]] Status setupNode(Node* node, const char* functionInGraph) noexcept final;
-  [[nodiscard]] Status setupSourcePort(Source* source, size_t sourcePort, const IBufferCopier* sourceOutputMemCopier) noexcept final;
+  [[nodiscard]] Status setupSourcePort(
+      Source* source,
+      size_t sourcePort,
+      const IBufferCopier* sourceOutputMemCopier) noexcept final;
 
-  void iterateOverConnections(void* context, void (*connectionIterator)(
-                                                 IDriver* driver,
-                                                 void* context,
-                                                 Source* source,
-                                                 size_t sourcePort,
-                                                 Sink* sink,
-                                                 size_t sinkPort) noexcept) noexcept final;
-  void iterateOverNodes(void* context, void (*nodeIterator)(IDriver* driver, void* context, Node* node) noexcept) noexcept final;
-  void iterateOverNodeAttributes(Node* node, void* context, void (*nodeAttrIterator)(
-                                                                IDriver* driver,
-                                                                Node* node,
-                                                                void* context,
-                                                                const char* attrName,
-                                                                const char* attrVal) noexcept) noexcept final;
+  void iterateOverConnections(
+      void* context,
+      void (*connectionIterator)(
+          IDriver* driver,
+          void* context,
+          Source* source,
+          size_t sourcePort,
+          Sink* sink,
+          size_t sinkPort) noexcept) noexcept final;
+  void iterateOverNodes(
+      void* context,
+      void (*nodeIterator)(IDriver* driver, void* context, Node* node) noexcept) noexcept final;
+  void iterateOverNodeAttributes(
+      Node* node,
+      void* context,
+      void (*nodeAttrIterator)(
+          IDriver* driver,
+          Node* node,
+          void* context,
+          const char* attrName,
+          const char* attrVal) noexcept) noexcept final;
   size_t getNodeName(Node* node, char* name, size_t nameBufLen, bool* foundOut) noexcept final;
 
   [[nodiscard]] Status doFilter() noexcept final;

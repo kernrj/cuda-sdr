@@ -299,6 +299,4 @@ Status RfToPcmAudio::readOutput(IBuffer** portOutputBuffers, size_t numPorts) no
   return mDriver->readOutput(portOutputBuffers, numPorts);
 }
 
-size_t RfToPcmAudio::preferredInputBufferSize(size_t port) noexcept {
-  return 1 << 20;
-}
+size_t RfToPcmAudio::preferredInputBufferSize(size_t port) noexcept { return 1 << 20; }

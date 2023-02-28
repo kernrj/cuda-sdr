@@ -56,7 +56,7 @@ class SliceRange final : public IBufferRange {
         sliceEnd,
         parentBuffer->range()->capacity());
 
-    return makeRefResultNonNull<IBufferRange>(new(nothrow) SliceRange(sliceStart, sliceEnd, parentBuffer));
+    return makeRefResultNonNull<IBufferRange>(new (nothrow) SliceRange(sliceStart, sliceEnd, parentBuffer));
   }
 
   [[nodiscard]] size_t capacity() const noexcept final {

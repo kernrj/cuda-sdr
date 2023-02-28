@@ -173,8 +173,10 @@ TEST(WhenTheFirstReadCantFitAllAvailableInputs, ItDoesntSkipAnyInputValues) {
   THROW_IF_ERR(cudaMemSet->memSet(outputBuffers2[0]->writePtr(), 0, outputBuffers1[0]->range()->capacity()));
 
   // Alignment causes capacity to be greater
-  ConstRef<IBuffer> outputBuffer1Slice = unwrap(bufferSliceFactory->slice(untrimmedOutputBuffer1, 0, outputBuffer1Size));
-  ConstRef<IBuffer> outputBuffer2Slice = unwrap(bufferSliceFactory->slice(untrimmedOutputBuffer2, 0, outputBuffer2Size));
+  ConstRef<IBuffer> outputBuffer1Slice =
+      unwrap(bufferSliceFactory->slice(untrimmedOutputBuffer1, 0, outputBuffer1Size));
+  ConstRef<IBuffer> outputBuffer2Slice =
+      unwrap(bufferSliceFactory->slice(untrimmedOutputBuffer2, 0, outputBuffer2Size));
 
   outputBuffers1[0] = outputBuffer1Slice;
   outputBuffers2[0] = outputBuffer2Slice;

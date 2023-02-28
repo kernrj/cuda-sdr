@@ -57,7 +57,6 @@ target_include_directories(
     "${GENERATED_HEADER_DIR}"
 )
 
-
 add_executable(nbfm_test nbfm_test.cpp)
 set_target_properties(nbfm_test PROPERTIES CUDA_ARCHITECTURES "${PROJ_CUDA_ARCHITECTURES}")
 target_link_libraries(nbfm_test PRIVATE ${LIB_TARGET_NAME})

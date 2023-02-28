@@ -54,7 +54,8 @@ Status ReadByteCountMonitor::readOutput(IBuffer** portOutputBuffers, size_t numP
   FWD_IF_ERR(mFilter->readOutput(portOutputBuffers, numPorts));
 
   for (size_t port = 0; port < numPorts; port++) {
-    const size_t byteCountJustRead = portOutputBuffers[port]->range()->used() - mUsedDataBeforeReadOnLastIteration[port];
+    const size_t byteCountJustRead =
+        portOutputBuffers[port]->range()->used() - mUsedDataBeforeReadOnLastIteration[port];
     mTotalByteCountRead[port] += byteCountJustRead;
   }
 

@@ -25,7 +25,8 @@ class CudaMemcpyFilterFactory final : public ICudaMemcpyFilterFactory {
   explicit CudaMemcpyFilterFactory(IFactories* factories)
       : mFactories(factories) {}
 
-  Result<Filter> createCudaMemcpy(cudaMemcpyKind memcpyKind, int32_t cudaDevice, cudaStream_t cudaStream) noexcept final {
+  Result<Filter> createCudaMemcpy(cudaMemcpyKind memcpyKind, int32_t cudaDevice, cudaStream_t cudaStream) noexcept
+      final {
     return CudaMemcpyFilter::create(memcpyKind, cudaDevice, cudaStream, mFactories);
   }
 

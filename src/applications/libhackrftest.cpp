@@ -27,17 +27,13 @@
 #include <stack>
 #include <string>
 
-#define SAFERF_RET(__cmd, __errorMsg)                           \
-  do {                                                          \
-    int status = (__cmd);                                       \
-    if (status != HACKRF_SUCCESS) {                             \
-      gsloge(                                                    \
-          "%s - Error %s (%d)",                                 \
-          (__errorMsg),                                         \
-          hackrf_error_name(static_cast<hackrf_error>(status)), \
-          status);                                              \
-      return 1;                                                 \
-    }                                                           \
+#define SAFERF_RET(__cmd, __errorMsg)                                                                           \
+  do {                                                                                                          \
+    int status = (__cmd);                                                                                       \
+    if (status != HACKRF_SUCCESS) {                                                                             \
+      gsloge("%s - Error %s (%d)", (__errorMsg), hackrf_error_name(static_cast<hackrf_error>(status)), status); \
+      return 1;                                                                                                 \
+    }                                                                                                           \
   } while (false)
 
 using namespace std;

@@ -29,6 +29,4 @@ Result<IMemory> SysMemAllocator::allocate(size_t size) noexcept {
   return makeRefResultNonNull<IMemory>(new (nothrow) Memory(data, size, freeMem, nullptr));
 }
 
-void SysMemAllocator::freeMem(uint8_t* data, [[maybe_unused]] void* context) noexcept {
-  delete[] data;
-}
+void SysMemAllocator::freeMem(uint8_t* data, [[maybe_unused]] void* context) noexcept { delete[] data; }

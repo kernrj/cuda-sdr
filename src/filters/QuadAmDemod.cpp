@@ -100,6 +100,4 @@ Status QuadAmDemod::readOutput(IBuffer** portOutputBuffers, size_t portCount) no
   return Status_Success;
 }
 
-size_t QuadAmDemod::preferredInputBufferSize(size_t port) noexcept {
-  return 1 << 20;
-}
+size_t QuadAmDemod::preferredInputBufferSize(size_t port) noexcept { return 1 << 20; }

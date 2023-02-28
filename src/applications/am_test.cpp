@@ -342,7 +342,9 @@ static ImmutableRef<Filter> createFrequencyShifter(
   auto driver = unwrap(factories->getFilterDriverFactory()->createFilterDriver());
   THROW_IF_ERR(driver->setupNode(cosineSource, SSTREAM("Produce a cosine signal [" << name << "]").c_str()));
   THROW_IF_ERR(driver->setupNode(multiplyRfSourceByCosine, SSTREAM("Multiply signals [" << name << "]").c_str()));
-  THROW_IF_ERR(driver->setupNode(lowPassFilter, SSTREAM("Low-pass filter to smooth out frequency shift [" << name << "]").c_str()));
+  THROW_IF_ERR(driver->setupNode(
+      lowPassFilter,
+      SSTREAM("Low-pass filter to smooth out frequency shift [" << name << "]").c_str()));
 
   driver->setDriverInput(multiplyWithOnlyPort0Exposed);
   driver->setDriverOutput(lowPassFilter);

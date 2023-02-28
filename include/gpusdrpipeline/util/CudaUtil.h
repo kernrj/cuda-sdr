@@ -26,12 +26,18 @@ GS_EXPORT [[nodiscard]] Result<int32_t> gsGetCurrentCudaDevice() noexcept;
 
 [[nodiscard]] inline const char* cudaMemcpyKindName(cudaMemcpyKind memcpyKind) noexcept {
   switch (memcpyKind) {
-    case cudaMemcpyHostToHost: return "host -> host";
-    case cudaMemcpyHostToDevice: return "host -> device";
-    case cudaMemcpyDeviceToDevice: return "device -> device";
-    case cudaMemcpyDeviceToHost: return "device -> host";
-    case cudaMemcpyDefault: return "default";
-    default: return "unknown";
+    case cudaMemcpyHostToHost:
+      return "host -> host";
+    case cudaMemcpyHostToDevice:
+      return "host -> device";
+    case cudaMemcpyDeviceToDevice:
+      return "device -> device";
+    case cudaMemcpyDeviceToHost:
+      return "device -> host";
+    case cudaMemcpyDefault:
+      return "default";
+    default:
+      return "unknown";
   }
 }
 

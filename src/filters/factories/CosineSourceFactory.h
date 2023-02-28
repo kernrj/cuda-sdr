@@ -32,10 +32,12 @@ class CosineSourceFactory final : public ICosineSourceFactory {
       cudaStream_t cudaStream) noexcept final {
     switch (sampleType) {
       case SampleType_FloatComplex:
-        return makeRefResultNonNull<Source>(new (std::nothrow) ComplexCosineSource(sampleRate, frequency, cudaDevice, cudaStream));
+        return makeRefResultNonNull<Source>(new (std::nothrow)
+                                                ComplexCosineSource(sampleRate, frequency, cudaDevice, cudaStream));
 
       case SampleType_Float:
-        return makeRefResultNonNull<Source>(new (std::nothrow) CosineSource(sampleRate, frequency, cudaDevice, cudaStream));
+        return makeRefResultNonNull<Source>(new (std::nothrow)
+                                                CosineSource(sampleRate, frequency, cudaDevice, cudaStream));
 
       default:
         gsloge("Sample type [%u] is not supported for cosine", sampleType);

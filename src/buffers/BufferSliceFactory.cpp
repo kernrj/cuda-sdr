@@ -26,7 +26,9 @@ Result<IBuffer> BufferSliceFactory::slice(
     size_t sliceStartOffset,
     size_t sliceEndOffset) noexcept {
   IBuffer* buffer;
-  UNWRAP_OR_FWD_RESULT(buffer, BufferSlice::create(bufferToSlice, sliceStartOffset, sliceEndOffset, mBufferRangeFactory));
+  UNWRAP_OR_FWD_RESULT(
+      buffer,
+      BufferSlice::create(bufferToSlice, sliceStartOffset, sliceEndOffset, mBufferRangeFactory));
 
   return makeRefResultNonNull(buffer);
 }

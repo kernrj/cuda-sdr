@@ -42,7 +42,7 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
   do {                                                        \
     cudaError_t checkCudaStatus__ = cudaDeviceSynchronize();  \
     if (checkCudaStatus__ != cudaSuccess) {                   \
-      gsloge(                                                  \
+      gsloge(                                                 \
           "%s: %s (%d). At %s:%d",                            \
           msgOnFail__,                                        \
           cudaGetErrorName(checkCudaStatus__),                \
@@ -58,7 +58,7 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
   do {                                                       \
     cudaError_t checkCudaStatus__ = cudaDeviceSynchronize(); \
     if (checkCudaStatus__ != cudaSuccess) {                  \
-      gsloge(                                                 \
+      gsloge(                                                \
           "%s: %s (%d). At %s:%d",                           \
           msgOnFail__,                                       \
           cudaGetErrorName(checkCudaStatus__),               \
@@ -74,7 +74,7 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
   do {                                                                      \
     cudaError_t checkCudaStatus__ = cudaDeviceSynchronize();                \
     if (checkCudaStatus__ != cudaSuccess) {                                 \
-      gsloge(                                                                \
+      gsloge(                                                               \
           "%s: %s (%d). At %s:%d",                                          \
           msgOnFail__,                                                      \
           cudaGetErrorName(checkCudaStatus__),                              \
@@ -90,7 +90,7 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
   do {                                                       \
     cudaError_t checkCudaStatus__ = cudaDeviceSynchronize(); \
     if (checkCudaStatus__ != cudaSuccess) {                  \
-      gsloge(                                                 \
+      gsloge(                                                \
           "%s: %s (%d). At %s:%d",                           \
           msgOnFail__,                                       \
           cudaGetErrorName(checkCudaStatus__),               \
@@ -113,7 +113,7 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
     CHECK_CUDA_OR_RET("Before: " #cudaCmd__, safeCudaRetOnFail__); \
     cudaError_t safeCudaStatus__ = (cudaCmd__);                    \
     if (safeCudaStatus__ != cudaSuccess) {                         \
-      gsloge(                                                       \
+      gsloge(                                                      \
           "CUDA error %s: %s. At %s:%d",                           \
           cudaGetErrorName(safeCudaStatus__),                      \
           cudaGetErrorString(safeCudaStatus__),                    \
@@ -130,7 +130,7 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
     CHECK_CUDA_OR_RET_STATUS("Before: " #cudaCmd__); \
     cudaError_t safeCudaStatus__ = (cudaCmd__);      \
     if (safeCudaStatus__ != cudaSuccess) {           \
-      gsloge(                                         \
+      gsloge(                                        \
           "CUDA error %s: %s. At %s:%d",             \
           cudaGetErrorName(safeCudaStatus__),        \
           cudaGetErrorString(safeCudaStatus__),      \
@@ -147,7 +147,7 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
     CHECK_CUDA_OR_RET_RESULT("Before: " #cudaCmd__);                       \
     cudaError_t safeCudaStatus__ = (cudaCmd__);                            \
     if (safeCudaStatus__ != cudaSuccess) {                                 \
-      gsloge(                                                               \
+      gsloge(                                                              \
           "CUDA error %s: %s. At %s:%d",                                   \
           cudaGetErrorName(safeCudaStatus__),                              \
           cudaGetErrorString(safeCudaStatus__),                            \
@@ -164,7 +164,7 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
     CHECK_CUDA_OR_THROW("Before: " #cudaCmd__); \
     cudaError_t safeCudaStatus__ = (cudaCmd__); \
     if (safeCudaStatus__ != cudaSuccess) {      \
-      gsloge(                                    \
+      gsloge(                                   \
           "CUDA error %s: %s. At %s:%d",        \
           cudaGetErrorName(safeCudaStatus__),   \
           cudaGetErrorString(safeCudaStatus__), \
@@ -180,7 +180,7 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
   do {                                          \
     cudaError_t safeCudaStatus__ = (cudaCmd__); \
     if (safeCudaStatus__ != cudaSuccess) {      \
-      gsloge(                                    \
+      gsloge(                                   \
           "CUDA error %s: %s. At %s:%d",        \
           cudaGetErrorName(safeCudaStatus__),   \
           cudaGetErrorString(safeCudaStatus__), \

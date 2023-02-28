@@ -24,8 +24,10 @@ class AddConstToVectorLengthFactory final : public IAddConstToVectorLengthFactor
  public:
   explicit AddConstToVectorLengthFactory(IFactories* factories)
       : mFactories(factories) {}
-  Result<Filter> createAddConstToVectorLength(float addValueToMagnitude, int32_t cudaDevice, cudaStream_t cudaStream) noexcept
-      final {
+  Result<Filter> createAddConstToVectorLength(
+      float addValueToMagnitude,
+      int32_t cudaDevice,
+      cudaStream_t cudaStream) noexcept final {
     return AddConstToVectorLength::create(addValueToMagnitude, cudaDevice, cudaStream, mFactories);
   }
 

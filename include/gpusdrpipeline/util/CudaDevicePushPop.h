@@ -74,7 +74,7 @@ class CudaDevicePushPop {
 #define CUDA_DEV_PUSH_POP_OR_THROW(deviceIndex__)                            \
   Result<CudaDevicePushPop> pushPopResult__ = pushCudaDevice(deviceIndex__); \
   if (pushPopResult__.status != Status_Success) {                            \
-    gsloge("Failed to set CUDA device to [%d]", deviceIndex__);  \
+    gsloge("Failed to set CUDA device to [%d]", deviceIndex__);              \
     throw std::runtime_error("Failed to set CUDA device.");                  \
   }
 

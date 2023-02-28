@@ -30,37 +30,27 @@ extern "C" {
 
 using namespace std;
 
-#define SAFE_FF(ffmpegCmd__)                                                                            \
-  do {                                                                                                  \
-    int ffmpegStatus__ = (ffmpegCmd__);                                                                 \
-    if (ffmpegStatus__ < 0 && ffmpegStatus__ != AVERROR(EAGAIN) && ffmpegStatus__ != AVERROR_EOF) {     \
-      char ffmpegErrorDescription__[128];                                                               \
-      av_make_error_string(ffmpegErrorDescription__, sizeof(ffmpegErrorDescription__), ffmpegStatus__); \
-                                                                                                        \
-      gsloge(                                                                                            \
-          "FFmpeg error [%d]: %s. At %s:%d",                                                            \
-          ffmpegStatus__,                                                                               \
-          ffmpegErrorDescription__,                                                                     \
-          __FILE__,                                                                                     \
-          __LINE__);                                                                                    \
-      throw runtime_error("FFmpeg Error");                                                              \
-    }                                                                                                   \
+#define SAFE_FF(ffmpegCmd__)                                                                                   \
+  do {                                                                                                         \
+    int ffmpegStatus__ = (ffmpegCmd__);                                                                        \
+    if (ffmpegStatus__ < 0 && ffmpegStatus__ != AVERROR(EAGAIN) && ffmpegStatus__ != AVERROR_EOF) {            \
+      char ffmpegErrorDescription__[128];                                                                      \
+      av_make_error_string(ffmpegErrorDescription__, sizeof(ffmpegErrorDescription__), ffmpegStatus__);        \
+                                                                                                               \
+      gsloge("FFmpeg error [%d]: %s. At %s:%d", ffmpegStatus__, ffmpegErrorDescription__, __FILE__, __LINE__); \
+      throw runtime_error("FFmpeg Error");                                                                     \
+    }                                                                                                          \
   } while (false)
 
-#define SAFE_FF_ONLY_LOG(ffmpegCmd__)                                                                   \
-  do {                                                                                                  \
-    int ffmpegStatus__ = (ffmpegCmd__);                                                                 \
-    if (ffmpegStatus__ < 0 && ffmpegStatus__ != AVERROR(EAGAIN) && ffmpegStatus__ != AVERROR_EOF) {     \
-      char ffmpegErrorDescription__[128];                                                               \
-      av_make_error_string(ffmpegErrorDescription__, sizeof(ffmpegErrorDescription__), ffmpegStatus__); \
-                                                                                                        \
-      gsloge(                                                                                            \
-          "FFmpeg error %d: %s. At %s:%d",                                                              \
-          ffmpegStatus__,                                                                               \
-          ffmpegErrorDescription__,                                                                     \
-          __FILE__,                                                                                     \
-          __LINE__);                                                                                    \
-    }                                                                                                   \
+#define SAFE_FF_ONLY_LOG(ffmpegCmd__)                                                                        \
+  do {                                                                                                       \
+    int ffmpegStatus__ = (ffmpegCmd__);                                                                      \
+    if (ffmpegStatus__ < 0 && ffmpegStatus__ != AVERROR(EAGAIN) && ffmpegStatus__ != AVERROR_EOF) {          \
+      char ffmpegErrorDescription__[128];                                                                    \
+      av_make_error_string(ffmpegErrorDescription__, sizeof(ffmpegErrorDescription__), ffmpegStatus__);      \
+                                                                                                             \
+      gsloge("FFmpeg error %d: %s. At %s:%d", ffmpegStatus__, ffmpegErrorDescription__, __FILE__, __LINE__); \
+    }                                                                                                        \
   } while (false)
 
 static Status ffmpegErrToStatus(int ffmpegStatus) noexcept {
@@ -76,22 +66,17 @@ static Status ffmpegErrToStatus(int ffmpegStatus) noexcept {
   }
 }
 
-#define SAFE_FF_RET(ffmpegCmd__)                                                                        \
-  do {                                                                                                  \
-    int ffmpegStatus__ = (ffmpegCmd__);                                                                 \
-    if (ffmpegStatus__ < 0 && ffmpegStatus__ != AVERROR(EAGAIN) && ffmpegStatus__ != AVERROR_EOF) {     \
-      char ffmpegErrorDescription__[128];                                                               \
-      av_make_error_string(ffmpegErrorDescription__, sizeof(ffmpegErrorDescription__), ffmpegStatus__); \
-                                                                                                        \
-      gsloge(                                                                                            \
-          "FFmpeg error %d: %s. At %s:%d",                                                              \
-          ffmpegStatus__,                                                                               \
-          ffmpegErrorDescription__,                                                                     \
-          __FILE__,                                                                                     \
-          __LINE__);                                                                                    \
-                                                                                                        \
-      return ffmpegErrToStatus(ffmpegStatus__);                                                         \
-    }                                                                                                   \
+#define SAFE_FF_RET(ffmpegCmd__)                                                                             \
+  do {                                                                                                       \
+    int ffmpegStatus__ = (ffmpegCmd__);                                                                      \
+    if (ffmpegStatus__ < 0 && ffmpegStatus__ != AVERROR(EAGAIN) && ffmpegStatus__ != AVERROR_EOF) {          \
+      char ffmpegErrorDescription__[128];                                                                    \
+      av_make_error_string(ffmpegErrorDescription__, sizeof(ffmpegErrorDescription__), ffmpegStatus__);      \
+                                                                                                             \
+      gsloge("FFmpeg error %d: %s. At %s:%d", ffmpegStatus__, ffmpegErrorDescription__, __FILE__, __LINE__); \
+                                                                                                             \
+      return ffmpegErrToStatus(ffmpegStatus__);                                                              \
+    }                                                                                                        \
   } while (false)
 
 static AVCodecContext* createCodecCtx(
@@ -313,7 +298,8 @@ Status AacFileWriter::encodeAndMuxAvailable(bool flush, size_t excludeByteCountI
     SAFE_FF_RET(writeAvailablePackets());
   }
 
-  FWD_IF_ERR(consumeInputBytesAndMoveUsedToStart(0, 0));  // The input buffer offset is increased by sendOneAudioBuffer().
+  FWD_IF_ERR(
+      consumeInputBytesAndMoveUsedToStart(0, 0));  // The input buffer offset is increased by sendOneAudioBuffer().
 
   return Status_Success;
 }
@@ -445,4 +431,3 @@ size_t AacFileWriter::preferredInputBufferSize(size_t port) noexcept {
   GS_REQUIRE_OR_ABORT(port == 0, "Port is out of range");
   return mAudioCodecInputBufferSize;
 }
-

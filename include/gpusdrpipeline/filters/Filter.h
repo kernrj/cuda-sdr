@@ -17,9 +17,9 @@
 #ifndef SDRTEST_SRC_FILTER_H_
 #define SDRTEST_SRC_FILTER_H_
 
+#include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/Status.h>
 #include <gpusdrpipeline/buffers/IBuffer.h>
-#include <gpusdrpipeline/Result.h>
 
 class Sink;
 class Source;

@@ -28,7 +28,7 @@ using namespace std;
     int hackrfStatus = (hackrfCmd__);                                                     \
     if (hackrfStatus != HACKRF_SUCCESS) {                                                 \
       const char* errorName = hackrf_error_name(static_cast<hackrf_error>(hackrfStatus)); \
-      gsloge("%s - Error %s (%d)", errorMsg__, errorName, hackrfStatus);      \
+      gsloge("%s - Error %s (%d)", errorMsg__, errorName, hackrfStatus);                  \
       return Status_RuntimeError;                                                         \
     }                                                                                     \
   } while (false)

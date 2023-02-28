@@ -273,11 +273,7 @@ class NbfmTest {
             factories->getAacFileWriterFactory()
                 ->createAacFileWriter(outputAudioFile, audioSampleRate, outputAudioBitRate, cudaDevice, cudaStream))) {
     gslogi("Input file [%s]", inputFileName);
-    gslogi(
-        "Output file [%s] sample rate [%zu] bit rate [%d]",
-        outputAudioFile,
-        audioSampleRate,
-        outputAudioBitRate);
+    gslogi("Output file [%s] sample rate [%zu] bit rate [%d]", outputAudioFile, audioSampleRate, outputAudioBitRate);
     gslogi("CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
     gslogi(
         "Channel frequency [%f], center frequency [%f] channel width [%f]",
@@ -336,7 +332,8 @@ class NbfmTest {
     auto cudaBufferFactory =
         unwrap(factories->createRelocatableResizableBufferFactory(cudaAllocator, deviceToDeviceMemcpy));
 
-    ImmutableRef<IRelocatableResizableBuffer> rfOutputBuffer = unwrap(cudaBufferFactory->createRelocatableBuffer(1 << 20));
+    ImmutableRef<IRelocatableResizableBuffer> rfOutputBuffer =
+        unwrap(cudaBufferFactory->createRelocatableBuffer(1 << 20));
     const size_t lowPassTapCount = mRfLowPassTaps.size();
     const size_t lowPassBufferSize = lowPassTapCount * sizeof(float);
     const auto gpuRfLowPassTaps = unwrap(cudaAllocator->allocate(lowPassBufferSize));
@@ -346,7 +343,8 @@ class NbfmTest {
       Source* gpuFloatSource = nullptr;
 
       if (useFileInput) {
-        ConstRef<IBuffer> samples = unwrap(hostToDevice->requestBuffer(0, floatQuadReader->getAlignedOutputDataSize(0)));
+        ConstRef<IBuffer> samples =
+            unwrap(hostToDevice->requestBuffer(0, floatQuadReader->getAlignedOutputDataSize(0)));
 
         outputBuffers[0] = samples;
         THROW_IF_ERR(floatQuadReader->readOutput(outputBuffers.data(), 1));

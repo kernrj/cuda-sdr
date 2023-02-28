@@ -196,9 +196,9 @@ target_link_directories(
 get_target_property(LIB_TARGET_TYPE ${LIB_TARGET_NAME} TYPE)
 if (LIB_TARGET_TYPE STREQUAL STATIC_LIBRARY)
     set(DEPENDENCY_VISIBILITY PUBLIC)
-else()
+else ()
     set(DEPENDENCY_VISIBILITY PRIVATE)
-endif()
+endif ()
 
 target_link_libraries(${LIB_TARGET_NAME}
     ${DEPENDENCY_VISIBILITY}
@@ -226,13 +226,13 @@ target_link_libraries(${LIB_TARGET_NAME}
     gsdr
     remez
     CUDA::cudart
-)
+    )
 
 proj_set_default_warning_flags(${LIB_TARGET_NAME} PRIVATE)
 
 if (CMAKE_BUILD_TYPE EQUAL "DEBUG" OR CMAKE_BUILD_TYPE EQUAL "RELWITHDEBINFO")
     target_compile_definitions(${LIB_TARGET_NAME} PRIVATE DEBUG)
-endif()
+endif ()
 
 include(GenerateExportHeader)
 

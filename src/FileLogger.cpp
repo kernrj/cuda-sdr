@@ -24,13 +24,20 @@
 
 static const char* paddedLogLevelName(LogLevel logLevel) {
   switch (logLevel) {
-    case GSLOG_TRACE: return "TRACE";
-    case GSLOG_DEBUG: return "DEBUG";
-    case GSLOG_INFO: return " INFO";
-    case GSLOG_WARN: return " WARN";
-    case GSLOG_ERROR: return "ERROR";
-    case GSLOG_FATAL: return "FATAL";
-    default: return "?????";
+    case GSLOG_TRACE:
+      return "TRACE";
+    case GSLOG_DEBUG:
+      return "DEBUG";
+    case GSLOG_INFO:
+      return " INFO";
+    case GSLOG_WARN:
+      return " WARN";
+    case GSLOG_ERROR:
+      return "ERROR";
+    case GSLOG_FATAL:
+      return "FATAL";
+    default:
+      return "?????";
   }
 }
 
