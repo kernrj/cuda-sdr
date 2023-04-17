@@ -17,6 +17,10 @@
 #ifndef GPUSDRPIPELINE_AACFILEWRITERFACTORY_H
 #define GPUSDRPIPELINE_AACFILEWRITERFACTORY_H
 
+#include <ParseJson.h>
+
+#include <nlohmann/json.hpp>
+
 #include "../AacFileWriter.h"
 #include "Factories.h"
 #include "filters/FilterFactories.h"
@@ -26,13 +30,29 @@ class AacFileWriterFactory final : public IAacFileWriterFactory {
   explicit AacFileWriterFactory(IFactories* factories)
       : mFactories(factories) {}
 
+  Result<Node> create(const char* jsonParameters) noexcept final {
+    nlohmann::json params;
+    UNWRAP_OR_FWD_RESULT(params, parseJson(jsonParameters));
+
+    const std::string commandQueueId = params["commandQueue"];
+    Ref<ICudaCommandQueue> commandQueue;
+    UNWRAP_OR_FWD_RESULT(
+        commandQueue,
+        mFactories->getCommandQueueFactory()->getCudaCommandQueue(commandQueueId.c_str()));
+
+    return ResultCast<Node>(createAacFileWriter(
+        params["outputFileName"].get<std::string>().c_str(),
+        params["sampleRate"],
+        params["bitRate"],
+        commandQueue.get()));
+  }
+
   Result<Sink> createAacFileWriter(
       const char* outputFileName,
       int32_t sampleRate,
       int32_t bitRate,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept final {
-    return AacFileWriter::create(outputFileName, sampleRate, bitRate, cudaDevice, cudaStream, mFactories);
+      ICudaCommandQueue* commandQueue) noexcept final {
+    return AacFileWriter::create(outputFileName, sampleRate, bitRate, commandQueue, mFactories);
   }
 
  private:

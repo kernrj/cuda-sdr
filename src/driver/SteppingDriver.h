@@ -42,10 +42,6 @@ class SteppingDriver final : public ISteppingDriver {
    */
   [[nodiscard]] Status connect(Source* source, size_t sourcePort, Sink* sink, size_t sinkPort) noexcept final;
   [[nodiscard]] Status setupNode(Node* node, const char* functionInGraph) noexcept final;
-  [[nodiscard]] Status setupSourcePort(
-      Source* source,
-      size_t sourcePort,
-      const IBufferCopier* sourceOutputMemCopier) noexcept final;
 
   void iterateOverConnections(
       void* context,
@@ -116,7 +112,6 @@ class SteppingDriver final : public ISteppingDriver {
   std::unordered_map<SourceKey, std::shared_ptr<SourcePortInfo>, SourceKeyHasher> mSourcePortInfo;
 
  private:
-  std::shared_ptr<SourcePortInfo> getOrCreateSourcePortInfo(const ImmutableRef<Source>& source, size_t port);
   std::shared_ptr<SourceConnectionInfo> getOrCreateSourceConnectionInfo(const ImmutableRef<Source>& source);
   std::shared_ptr<SinkConnectionInfo> getOrCreateSinkConnectionInfo(const ImmutableRef<Sink>& sink);
   [[nodiscard]] std::shared_ptr<SinkConnectionInfo> getSinkConnectionInfo(Sink* sink);

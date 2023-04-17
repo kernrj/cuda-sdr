@@ -17,99 +17,88 @@
 #ifndef GPUSDRPIPELINE_FILTERFACTORIES_H
 #define GPUSDRPIPELINE_FILTERFACTORIES_H
 
-#include <cuda_runtime.h>
 #include <gpusdrpipeline/Modulation.h>
 #include <gpusdrpipeline/SampleType.h>
+#include <gpusdrpipeline/commandqueue/ICudaCommandQueue.h>
 #include <gpusdrpipeline/filters/Filter.h>
 #include <gpusdrpipeline/filters/IHackrfSource.h>
 #include <gpusdrpipeline/filters/IPortRemappingSink.h>
 #include <gpusdrpipeline/filters/IReadByteCountMonitor.h>
 
+#include "IPortRemappingSource.h"
+
+class INodeFactory : public virtual IRef {
+ public:
+  virtual Result<Node> create(const char* jsonParameters) noexcept = 0;
+  ABSTRACT_IREF(INodeFactory);
+};
+
+GS_EXPORT [[nodiscard]] Result<Node> createNode(const char* name, const char* jsonParameters) noexcept;
 GS_EXPORT [[nodiscard]] Result<Filter> createFilter(const char* name, const char* jsonParameters) noexcept;
 GS_EXPORT [[nodiscard]] Result<Source> createSource(const char* name, const char* jsonParameters) noexcept;
-GS_EXPORT [[nodiscard]] Result<Source> createSink(const char* name, const char* jsonParameters) noexcept;
+GS_EXPORT [[nodiscard]] Result<Sink> createSink(const char* name, const char* jsonParameters) noexcept;
 
-GS_EXPORT [[nodiscard]] bool hasFilterFactory(const char* name) noexcept;
-GS_EXPORT [[nodiscard]] bool hasSourceFactory(const char* name) noexcept;
-GS_EXPORT [[nodiscard]] bool hasSinkFactory(const char* name) noexcept;
+GS_EXPORT [[nodiscard]] bool hasNodeFactory(const char* name) noexcept;
+GS_EXPORT [[nodiscard]] Status registerNodeFactory(const char* name, INodeFactory* filterFactory) noexcept;
+GS_EXPORT [[nodiscard]] Status registerDefaultNodeFactories() noexcept;
 
-GS_EXPORT void registerFilterFactory(
-    const char* name,
-    void* context,
-    Filter* (*filterFactory)(const char* jsonParamters)) noexcept;
-
-GS_EXPORT void registerSourceFactory(
-    const char* name,
-    void* context,
-    Source* (*filterFactory)(const char* jsonParamters)) noexcept;
-
-GS_EXPORT void registerSinkFactory(
-    const char* name,
-    void* context,
-    Sink* (*sinkFactory)(const char* jsonParamters)) noexcept;
-
-class ICudaMemcpyFilterFactory : public virtual IRef {
+class ICudaMemcpyFilterFactory : public INodeFactory {
  public:
   [[nodiscard]] virtual Result<Filter> createCudaMemcpy(
       cudaMemcpyKind memcpyKind,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept = 0;
+      ICudaCommandQueue* commandQueue) noexcept = 0;
 
   ABSTRACT_IREF(ICudaMemcpyFilterFactory);
 };
 
-class IAacFileWriterFactory : public virtual IRef {
+class IAacFileWriterFactory : public INodeFactory {
  public:
   [[nodiscard]] virtual Result<Sink> createAacFileWriter(
       const char* outputFileName,
       int32_t sampleRate,
       int32_t bitRate,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept = 0;
+      ICudaCommandQueue* commandQueue) noexcept = 0;
 
   ABSTRACT_IREF(IAacFileWriterFactory);
 };
 
-class IAddConstFactory : public virtual IRef {
+class IAddConstFactory : public INodeFactory {
  public:
   [[nodiscard]] virtual Result<Filter> createAddConst(
       float addValueToAmplitude,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept = 0;
+      ICudaCommandQueue* commandQueue) noexcept = 0;
 
   ABSTRACT_IREF(IAddConstFactory);
 };
 
-class IAddConstToVectorLengthFactory : public virtual IRef {
+class IAddConstToVectorLengthFactory : public INodeFactory {
  public:
   [[nodiscard]] virtual Result<Filter> createAddConstToVectorLength(
       float addValueToMagnitude,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept = 0;
+      ICudaCommandQueue* commandQueue) noexcept = 0;
 
   ABSTRACT_IREF(IAddConstToVectorLengthFactory);
 };
 
-class ICosineSourceFactory : public virtual IRef {
+class ICosineSourceFactory : public INodeFactory {
  public:
   [[nodiscard]] virtual Result<Source> createCosineSource(
       SampleType sampleType,
       float sampleRate,
       float frequency,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept = 0;
+      ICudaCommandQueue* commandQueue) noexcept = 0;
 
   ABSTRACT_IREF(ICosineSourceFactory);
 };
 
-class IFileReaderFactory : public virtual IRef {
+class IFileReaderFactory : public INodeFactory {
  public:
   [[nodiscard]] virtual Result<Source> createFileReader(const char* fileName) noexcept = 0;
 
   ABSTRACT_IREF(IFileReaderFactory);
 };
 
-class IFirFactory : public virtual IRef {
+class IFirFactory : public INodeFactory {
  public:
   [[nodiscard]] virtual Result<Filter> createFir(
       SampleType tapType,
@@ -117,55 +106,59 @@ class IFirFactory : public virtual IRef {
       size_t decimation,
       const float* taps,
       size_t tapCount,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept = 0;
+      ICudaCommandQueue* commandQueue) noexcept = 0;
 
   ABSTRACT_IREF(IFirFactory);
 };
 
-class IHackrfSourceFactory : public virtual IRef {
+class IHackrfSourceFactory : public INodeFactory {
  public:
   [[nodiscard]] virtual Result<IHackrfSource> createHackrfSource(
       int32_t deviceIndex,
-      uint64_t frequency,
+      uint64_t centerFrequency,
       double sampleRate,
       size_t maxBufferCountBeforeDropping) noexcept = 0;
 
   ABSTRACT_IREF(IHackrfSourceFactory);
 };
 
-class ICudaFilterFactory : public virtual IRef {
+class ICudaFilterFactory : public INodeFactory {
  public:
-  [[nodiscard]] virtual Result<Filter> createFilter(int32_t cudaDevice, cudaStream_t cudaStream) noexcept = 0;
+  [[nodiscard]] virtual Result<Filter> createFilter(ICudaCommandQueue* commandQueue) noexcept = 0;
 
   ABSTRACT_IREF(ICudaFilterFactory);
 };
 
-class IQuadDemodFactory : public virtual IRef {
- public:
-  /**
-   * @param fskDeviation Only used for FM
-   */
-  [[nodiscard]] virtual Result<Filter> create(
-      Modulation modulation,
-      float rfSampleRate,
-      float fskDeviation,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept = 0;
-
-  ABSTRACT_IREF(IQuadDemodFactory);
-};
-
 class IPortRemappingSinkFactory : public virtual IRef {
  public:
-  [[nodiscard]] virtual Result<IPortRemappingSink> create(Sink* mapToSink) noexcept = 0;
+  [[nodiscard]] virtual Result<IPortRemappingSink> create() noexcept = 0;
 
   ABSTRACT_IREF(IPortRemappingSinkFactory);
 };
 
-class IRfToPcmAudioFactory : public virtual IRef {
+class IPortRemappingSourceFactory : public virtual IRef {
  public:
-  [[nodiscard]] virtual Result<Filter> create(
+  [[nodiscard]] virtual Result<IPortRemappingSource> create() noexcept = 0;
+
+  ABSTRACT_IREF(IPortRemappingSourceFactory);
+};
+
+class IQuadDemodFactory : public INodeFactory {
+ public:
+  /**
+   * @param fskDeviation Only used for FM
+   */
+  [[nodiscard]] virtual Result<Filter> createQuadDemod(
+      Modulation modulation,
+      float rfSampleRate,
+      float fskDeviation,
+      ICudaCommandQueue* commandQueue) noexcept = 0;
+  ABSTRACT_IREF(IQuadDemodFactory);
+};
+
+class IRfToPcmAudioFactory : public INodeFactory {
+ public:
+  [[nodiscard]] virtual Result<Filter> createRfToPcm(
       float rfSampleRate,
       Modulation modulation,
       size_t rfLowPassDecim,
@@ -173,11 +166,10 @@ class IRfToPcmAudioFactory : public virtual IRef {
       float centerFrequency,
       float channelFrequency,
       float channelWidth,
-      float fskDevationIfFm,
+      float fskDeviationIfFm,
       float rfLowPassDbAttenuation,
       float audioLowPassDbAttenuation,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept = 0;
+      const char* commandQueueId) noexcept = 0;
 
   ABSTRACT_IREF(IRfToPcmAudioFactory);
 };

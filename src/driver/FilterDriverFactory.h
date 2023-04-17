@@ -22,16 +22,10 @@
 
 class FilterDriverFactory final : public IFilterDriverFactory {
  public:
-  explicit FilterDriverFactory(IFactories* factories)
-      : mFactories(factories) {}
+  explicit FilterDriverFactory(IFactories* factories) noexcept;
 
-  Result<IFilterDriver> createFilterDriver() noexcept final {
-    ISteppingDriverFactory* steppingDriverFactory = mFactories->getSteppingDriverFactory();
-    ISteppingDriver* steppingDriver;
-    UNWRAP_OR_FWD_RESULT(steppingDriver, steppingDriverFactory->createSteppingDriver());
-
-    return makeRefResultNonNull<IFilterDriver>(new (std::nothrow) FilterDriver(steppingDriver));
-  }
+  Result<Node> create(const char* jsonParameters) noexcept final;
+  Result<IFilterDriver> createFilterDriver() noexcept final;
 
  private:
   ConstRef<IFactories> mFactories;

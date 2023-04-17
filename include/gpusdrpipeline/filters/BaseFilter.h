@@ -21,6 +21,7 @@
 #include <gpusdrpipeline/buffers/IBufferSliceFactory.h>
 #include <gpusdrpipeline/buffers/IRelocatableResizableBufferFactory.h>
 #include <gpusdrpipeline/filters/BaseSink.h>
+#include <gpusdrpipeline/filters/BaseSource.h>
 #include <gpusdrpipeline/filters/Filter.h>
 
 #include <cstdint>
@@ -30,7 +31,7 @@
  * Provides requestBuffer() and commitBuffer() methods. requestBuffer() provides GPU memory, with size and address
  * aligned to the value passed into the constructor via PortSpec.
  */
-class BaseFilter : public virtual Filter, public BaseSink {
+class BaseFilter : public virtual Filter, public BaseSink, public BaseSource {
  public:
   BaseFilter() = delete;
 
@@ -39,6 +40,7 @@ class BaseFilter : public virtual Filter, public BaseSink {
       IRelocatableResizableBufferFactory* relocatableResizableBufferFactory,
       IBufferSliceFactory* slicedBufferFactory,
       size_t inputPortCount,
+      std::vector<ImmutableRef<IBufferCopier>>&& outputPortBufferCopiers,
       IMemSet* memSet = nullptr) noexcept;
 
   ~BaseFilter() override = default;

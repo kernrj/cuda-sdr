@@ -25,16 +25,6 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(remez)
 
 FetchContent_Declare(
-    mongoose
-    GIT_REPOSITORY https://github.com/cesanta/mongoose.git
-    GIT_TAG 7.9
-    CMAKE_ARGS
-    -DMG_ENABLE_IPV6=1
-    -DMG_ENABLE_OPENSSL=1
-)
-FetchContent_MakeAvailable(mongoose)
-
-FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.2
@@ -54,6 +44,7 @@ target_include_directories(
     SYSTEM PRIVATE
     "${LIB_PROJECT_ROOT_DIR}/include"
     "${remez_SOURCE_DIR}/include"
+    "${nlohmann_json_SOURCE_DIR}/include"
     "${GENERATED_HEADER_DIR}"
 )
 
@@ -66,6 +57,7 @@ target_include_directories(
     SYSTEM PRIVATE
     "${LIB_DEV_PUBLIC_HEADER_DIR}"
     "${remez_SOURCE_DIR}/include"
+    "${nlohmann_json_SOURCE_DIR}/include"
     "${GENERATED_HEADER_DIR}"
 )
 
@@ -78,6 +70,7 @@ target_include_directories(
     SYSTEM PRIVATE
     "${LIB_DEV_PUBLIC_HEADER_DIR}"
     "${remez_SOURCE_DIR}/include"
+    "${nlohmann_json_SOURCE_DIR}/include"
     "${GENERATED_HEADER_DIR}"
 )
 
@@ -90,18 +83,18 @@ target_include_directories(
     SYSTEM PRIVATE
     "${LIB_DEV_PUBLIC_HEADER_DIR}"
     "${remez_SOURCE_DIR}/include"
+    "${nlohmann_json_SOURCE_DIR}/include"
     "${GENERATED_HEADER_DIR}"
 )
 
-add_executable(test_server test_server.cpp "${mongoose_SOURCE_DIR}/mongoose.c")
-set_target_properties(test_server PROPERTIES CUDA_ARCHITECTURES all)
-target_link_libraries(test_server PRIVATE ${LIB_TARGET_NAME})
-proj_set_default_warning_flags(test_server PRIVATE)
+add_executable(server server.cpp)
+set_target_properties(server PROPERTIES CUDA_ARCHITECTURES all)
+target_link_libraries(server PRIVATE ${LIB_TARGET_NAME} nghttp2)
+proj_set_default_warning_flags(server PRIVATE)
 target_include_directories(
-    test_server
+    server
     SYSTEM PRIVATE
     "${LIB_DEV_PUBLIC_HEADER_DIR}"
-    "${mongoose_SOURCE_DIR}"
     "${nlohmann_json_SOURCE_DIR}/include"
     "${GENERATED_HEADER_DIR}"
 )
@@ -115,6 +108,7 @@ target_include_directories(
     "${LIB_PROJECT_ROOT_DIR}/include"
     "${remez_SOURCE_DIR}/include"
     "${gsdr_SOURCE_DIR}/include"
+    "${nlohmann_json_SOURCE_DIR}/include"
     "${GENERATED_HEADER_DIR}"
 )
 

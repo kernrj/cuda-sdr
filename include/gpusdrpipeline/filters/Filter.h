@@ -20,16 +20,20 @@
 #include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/Status.h>
 #include <gpusdrpipeline/buffers/IBuffer.h>
+#include <gpusdrpipeline/buffers/IBufferCopier.h>
 
 class Sink;
 class Source;
+class Filter;
 class IDriver;
 
 class Node : public virtual IRef {
  public:
   virtual Sink* asSink() noexcept { return nullptr; }
   virtual Source* asSource() noexcept { return nullptr; }
+  virtual Filter* asFilter() noexcept { return nullptr; }
   virtual IDriver* asDriver() noexcept { return nullptr; }
+  virtual void updateParameters(const char* jsonParameters) noexcept {};
 
   ABSTRACT_IREF(Node);
 };
@@ -87,6 +91,13 @@ class Source : public virtual Node {
   [[nodiscard]] virtual size_t getOutputSizeAlignment(size_t port) noexcept = 0;
 
   /**
+   * Can be used to copy an IBuffer passed to readOutput().
+   *
+   * @return A non-null IBufferCopier*
+   */
+  [[nodiscard]] virtual IBufferCopier* getOutputCopier(size_t port) noexcept = 0;
+
+  /**
    * To read all available data, and to account for vectorized operations, the
    * Buffer passed to the next call to readOutput() for the given port must be
    * at least this size. This value is always >= the value returned by
@@ -122,6 +133,8 @@ class Source : public virtual Node {
 
 class Filter : public virtual Sink, public virtual Source {
   ABSTRACT_IREF(Filter);
+
+  Filter* asFilter() noexcept override { return this; }
 };
 
 #endif  // SDRTEST_SRC_FILTER_H_

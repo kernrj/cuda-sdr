@@ -42,14 +42,6 @@ using namespace std;
 // Example: SSTREAM("hello " << username << " you are " << age << " years old.");
 #define SSTREAM(x) dynamic_cast<std::ostringstream&&>(std::ostringstream() << x).str()
 
-// Example: GS_FAIL("Illegal argument: " << argument);
-#define GS_FAIL(x)                   \
-  do {                               \
-    auto __msg = SSTREAM(x);         \
-    std::cerr << __msg << std::endl; \
-    throw std::runtime_error(__msg); \
-  } while (false)
-
 #define SAFERF(__cmd, __errorMsg)                                                    \
   do {                                                                               \
     int status = (__cmd);                                                            \
@@ -223,8 +215,7 @@ class NbfmTest {
  public:
   NbfmTest()
       : factories(unwrap(getFactoriesSingleton())),
-        cudaDevice(0),
-        cudaStream(createCudaStream()),
+        mCommandQueue(unwrap(factories->getCudaCommandQueueFactory()->create(0))),
         mRfLowPassTaps(createLowPassTaps(
             rfSampleRate,
             rfLowPassCutoffFrequency,
@@ -236,49 +227,45 @@ class NbfmTest {
             audioLowPassTransitionWidth,
             audioLowPassDbAttenuation)),
         hackrfSource(
-            unwrap(factories->getHackrfSourceFactory()->createHackrfSource(0, centerFrequency, rfSampleRate, 3))),
+            unwrap(factories->getHackrfSourceFactory()->createHackrfSource(0, tunedFrequency, rfSampleRate, 3))),
         hostToDevice(unwrap(
-            factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyHostToDevice, cudaDevice, cudaStream))),
-        convertHackrfInputToFloat(unwrap(factories->getInt8ToFloatFactory()->createFilter(cudaDevice, cudaStream))),
+            factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyHostToDevice, mCommandQueue))),
+        convertHackrfInputToFloat(unwrap(factories->getInt8ToFloatFactory()->createFilter(mCommandQueue))),
         cosineSource(unwrap(factories->getCosineSourceFactory()->createCosineSource(
             SampleType_FloatComplex,
             rfSampleRate,
-            centerFrequency - channelFrequency,
-            cudaDevice,
-            cudaStream))),
-        multiplyRfSourceByCosine(unwrap(factories->getMultiplyFactory()->createFilter(cudaDevice, cudaStream))),
+            tunedFrequency - channelFrequency,
+            mCommandQueue))),
+        multiplyRfSourceByCosine(unwrap(factories->getMultiplyFactory()->createFilter(mCommandQueue))),
         rfLowPassFilter(unwrap(factories->getFirFactory()->createFir(
             /* tapType= */ SampleType_Float,
             /* elementType= */ SampleType_FloatComplex,
             rfLowPassDecimation,
             mRfLowPassTaps.data(),
             mRfLowPassTaps.size(),
-            cudaDevice,
-            cudaStream))),
+            mCommandQueue))),
         quadDemod(unwrap(
             factories->getQuadDemodFactory()
-                ->create(Modulation_Fm, quadDemodInputSampleRate, kWbfmFrequencyDeviation, cudaDevice, cudaStream))),
+                ->createQuadDemod(Modulation_Fm, quadDemodInputSampleRate, kWbfmFrequencyDeviation, mCommandQueue))),
         audioLowPassFilter(unwrap(factories->getFirFactory()->createFir(
             /* tapType= */ SampleType_Float,
             /* elementType= */ SampleType_FloatComplex,
             audioLowPassDecimation,
             mRfLowPassTaps.data(),
             mRfLowPassTaps.size(),
-            cudaDevice,
-            cudaStream))),
+            mCommandQueue))),
         deviceToHost(unwrap(
-            factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyDeviceToHost, cudaDevice, cudaStream))),
+            factories->getCudaMemcpyFilterFactory()->createCudaMemcpy(cudaMemcpyDeviceToHost, mCommandQueue))),
         floatQuadReader(unwrap(factories->getFileReaderFactory()->createFileReader(inputFileName))),
         audioFileWriter(unwrap(
             factories->getAacFileWriterFactory()
-                ->createAacFileWriter(outputAudioFile, audioSampleRate, outputAudioBitRate, cudaDevice, cudaStream))) {
+                ->createAacFileWriter(outputAudioFile, audioSampleRate, outputAudioBitRate, mCommandQueue))) {
     gslogi("Input file [%s]", inputFileName);
     gslogi("Output file [%s] sample rate [%zu] bit rate [%d]", outputAudioFile, audioSampleRate, outputAudioBitRate);
-    gslogi("CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
     gslogi(
-        "Channel frequency [%f], center frequency [%f] channel width [%f]",
+        "Channel frequency [%f], tuned frequency [%f] channel width [%f]",
         channelFrequency,
-        centerFrequency,
+        tunedFrequency,
         channelWidth);
     gslogi("RF sample rate [%zu]", rfSampleRate);
     gslogi(
@@ -296,21 +283,21 @@ class NbfmTest {
         audioLowPassDbAttenuation,
         audioLowPassDecimation,
         mAudioLowPassTaps.size());
-    gslogi("Cosine source frequency [%f]", centerFrequency - channelFrequency);
+    gslogi("Cosine source frequency [%f]", tunedFrequency - channelFrequency);
     gslogi("Quad demod gain [%f]", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
   }
 
   void start() {
     if (!useFileInput) {
-      hackrfSource->start();
+      throwIfError(hackrfSource->start());
     }
   }
 
   void stop() {
     if (!useFileInput) {
       gslogi("stop() - live");
-      hackrfSource->stop();
-      hackrfSource->releaseDevice();
+      throwIfError(hackrfSource->stop());
+      throwIfError(hackrfSource->releaseDevice());
     } else {
       gslogi("stop() - file");
     }
@@ -320,15 +307,14 @@ class NbfmTest {
     size_t receivedRfSampleCount = 0;
     size_t wroteSampleCount = 0;
 
-    CUDA_DEV_PUSH_POP_OR_RET_STATUS(cudaDevice);
     vector<IBuffer*> outputBuffers(1);
 
     auto cudaAllocator =
-        unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, 32, false));
+        unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(mCommandQueue, 32, false));
     auto hostToDeviceMemcpy = unwrap(
-        factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyHostToDevice));
+        factories->getCudaBufferCopierFactory()->createBufferCopier(mCommandQueue, cudaMemcpyHostToDevice));
     auto deviceToDeviceMemcpy = unwrap(
-        factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToDevice));
+        factories->getCudaBufferCopierFactory()->createBufferCopier(mCommandQueue, cudaMemcpyDeviceToDevice));
     auto cudaBufferFactory =
         unwrap(factories->createRelocatableResizableBufferFactory(cudaAllocator, deviceToDeviceMemcpy));
 
@@ -379,7 +365,6 @@ class NbfmTest {
         gpuFloatSource = convertHackrfInputToFloat.get();
 
         gslogi(
-            GSLOG_INFO,
             "Available [%zu] [%zu]",
             convertHackrfInputToFloat->getOutputDataSize(0),
             convertHackrfInputToFloat->getAlignedOutputDataSize(0));
@@ -414,9 +399,8 @@ class NbfmTest {
           audioLowPassBuffer->base());
       SAFE_CUDA(gsdrFmDemod(
           rfSampleRate,
-          centerFrequency,
+          tunedFrequency,
           channelFrequency,
-          channelWidth,
           channelFmDeviation,
           rfLowPassDecimation,
           firstSampleOffset,
@@ -425,8 +409,8 @@ class NbfmTest {
           rfOutputBuffer->readPtr<cuComplex>(),
           audioLowPassBuffer->writePtr<float>(),
           fmDemodOutputCount,
-          cudaDevice,
-          cudaStream));
+          mCommandQueue->cudaDevice(),
+          mCommandQueue->cudaStream()));
 
       THROW_IF_ERR(rfOutputBuffer->relocateUsedToStart());
 
@@ -444,8 +428,6 @@ class NbfmTest {
       outputBuffers[0] = audioEncMuxInputBuffer;
       THROW_IF_ERR(deviceToHost->readOutput(outputBuffers.data(), 1));
 
-      cudaStreamSynchronize(cudaStream);
-
       wroteSampleCount += audioEncMuxInputBuffer->range()->used() / sizeof(float);
       THROW_IF_ERR(audioFileWriter->commitBuffer(0, audioEncMuxInputBuffer->range()->used()));
     }
@@ -461,8 +443,7 @@ class NbfmTest {
   const char* const outputAudioFile = "/home/rick/sdr/allgpu.ts";
 
   ConstRef<IFactories> factories;
-  const int32_t cudaDevice;
-  cudaStream_t cudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
   const vector<float> mRfLowPassTaps;
   const vector<float> mAudioLowPassTaps;
   ConstRef<IHackrfSource> hackrfSource;
@@ -481,7 +462,7 @@ class NbfmTest {
   static constexpr float maxRfSampleRate = 20e6;
   static constexpr size_t audioSampleRate = 48e3;
   static constexpr int32_t outputAudioBitRate = 128000;
-  static constexpr float centerFrequency = 144e6;
+  static constexpr float tunedFrequency = 144e6;
   static constexpr float channelFrequency = 145.45e6;
   static constexpr float rfLowPassDbAttenuation = -60.0f;
   static constexpr float audioLowPassDbAttenuation = -60.0f;
@@ -498,7 +479,7 @@ class NbfmTest {
   // 98.5MHz channel (WBFM) file capture. RF sample rate 4.8MHz, center frequency 97.5MHz.
   static constexpr size_t audioSampleRate = 48e3;
   static constexpr int32_t outputAudioBitRate = 128000;
-  static constexpr float centerFrequency = 97.5e6;
+  static constexpr float tunedFrequency = 97.5e6;
   static constexpr float channelFrequency = 98.5e6;
   static constexpr float channelFmDeviation = kWbfmFrequencyDeviation;
   static constexpr float rfLowPassDbAttenuation = -60.0f;
@@ -516,7 +497,7 @@ class NbfmTest {
     static constexpr size_t maxRfSampleRate = 19.968e6;  // Largest multiple of 48KHz less than 20MHz, 416 * 48000
     static constexpr size_t audioSampleRate = 48e3;
     static constexpr int32_t outputAudioBitRate = 128000;
-    static constexpr float centerFrequency = 97.5e6;
+    static constexpr float tunedFrequency = 97.5e6;
     static constexpr float channelFrequency = 98.5e6;
     static constexpr float rfLowPassDbAttenuation = -60.0f;
     static constexpr float audioLowPassDbAttenuation = -60.0f;

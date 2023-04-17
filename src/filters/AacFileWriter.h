@@ -36,8 +36,7 @@ class AacFileWriter final : public BaseSink {
       const char* outputFileName,
       int32_t sampleRate,
       int32_t bitRate,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       IFactories* factories) noexcept;
 
   [[nodiscard]] Result<IBuffer> requestBuffer(size_t port, size_t numBytes) noexcept final;
@@ -73,8 +72,7 @@ class AacFileWriter final : public BaseSink {
       const char* outputFileName,
       int32_t sampleRate,
       int32_t bitRate,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       IAllocator* sysMemAllocator,
       IRelocatableResizableBufferFactory* sysMemRelocatableBufferFactory,
       IBufferSliceFactory* bufferSliceFactory);

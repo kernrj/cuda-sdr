@@ -20,16 +20,16 @@
 #include <cuda_runtime.h>
 
 #include "buffers/IMemSet.h"
+#include "commandqueue/ICudaCommandQueue.h"
 
 class CudaMemSet final : public IMemSet {
  public:
-  CudaMemSet(int32_t cudaDevice, cudaStream_t cudaStream);
+  CudaMemSet(ICudaCommandQueue* commandQueue);
 
   Status memSet(void* data, uint8_t value, size_t byteCount) noexcept final;
 
  private:
-  const int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
 
   REF_COUNTED(CudaMemSet);
 };

@@ -21,7 +21,7 @@
 
 class IPortRemappingSink : public virtual Sink {
  public:
-  virtual void addPortMapping(size_t outerPort, size_t innerPort) noexcept = 0;
+  virtual void addPortMapping(size_t outerPort, Sink* innerSink, size_t innerSinkPort) noexcept = 0;
 
   ABSTRACT_IREF(IPortRemappingSink);
 };

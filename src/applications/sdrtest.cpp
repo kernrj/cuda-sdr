@@ -19,6 +19,7 @@
 #include <gnuradio/blocks/wavfile_sink.h>
 #include <gnuradio/filter/firdes.h>
 #include <gnuradio/top_block.h>
+#include <gpusdrpipeline/Factories.h>
 #include <gpusdrpipeline/GSLog.h>
 #include <gpusdrpipeline/fm.h>
 #include <osmosdr/source.h>
@@ -200,12 +201,16 @@ int nbfmFromRaw() {
         .channelWidth = kNbfmChannelWidth,
     };
 
+    ConstRef<ICudaCommandQueue> commandQueue =
+        unwrap(unwrap(getFactoriesSingleton())->getCudaCommandQueueFactory()->create(0));
+
     const auto fmDemod = fm_pipeline::make(
         fmChannel,
         centerFreq,
         static_cast<int32_t>(rfSampleRate),
         audioSampleRate,
-        lowPassFilterDecimation);
+        lowPassFilterDecimation,
+        commandQueue);
 
     topBlock->connect(source, 0, fmDemod, 0);
     topBlock->connect(fmDemod, 0, wavFileSink, 0);
@@ -262,12 +267,16 @@ int nbfm() {
         .channelWidth = kNbfmChannelWidth,
     };
 
+    ConstRef<ICudaCommandQueue> commandQueue =
+        unwrap(unwrap(getFactoriesSingleton())->getCudaCommandQueueFactory()->create(0));
+
     const auto fmDemod = fm_pipeline::make(
         fmChannel,
         centerFreq,
         static_cast<int32_t>(rfSampleRate),
         audioSampleRate,
-        lowPassFilterDecimation);
+        lowPassFilterDecimation,
+        commandQueue);
 
     topBlock->connect(osmoSource, 0, fmDemod, 0);
     topBlock->connect(fmDemod, 0, wavFileSink, 0);
@@ -339,12 +348,16 @@ int fmRadio(int argc, char** argv) {
         .channelWidth = kWbfmChannelWidth,
     };
 
+    ConstRef<ICudaCommandQueue> commandQueue =
+        unwrap(unwrap(getFactoriesSingleton())->getCudaCommandQueueFactory()->create(0));
+
     const auto fmDemod = fm_pipeline::make(
         fmChannel,
         centerFreq,
         static_cast<int32_t>(rfSampleRate),
         audioSampleRate,
-        lowPassFilterDecimation);
+        lowPassFilterDecimation,
+        commandQueue);
 
     topBlock->connect(osmoSource, 0, fmDemod, 0);
     topBlock->connect(fmDemod, 0, wavFileSink, 0);

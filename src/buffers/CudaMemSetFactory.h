@@ -22,8 +22,8 @@
 
 class CudaMemSetFactory final : public ICudaMemSetFactory {
  public:
-  Result<IMemSet> create(int32_t cudaDevice, cudaStream_t cudaStream) noexcept final {
-    return makeRefResultNonNull<IMemSet>(new (std::nothrow) CudaMemSet(cudaDevice, cudaStream));
+  Result<IMemSet> create(ICudaCommandQueue* commandQueue) noexcept final {
+    return makeRefResultNonNull<IMemSet>(new (std::nothrow) CudaMemSet(commandQueue));
   }
 
   REF_COUNTED(CudaMemSetFactory);

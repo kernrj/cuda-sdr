@@ -18,18 +18,38 @@
 
 #include <cuda_runtime.h>
 #include <gsdr/gsdr.h>
+#include <util/util.h>
 
 #include "GSErrors.h"
 #include "util/CudaDevicePushPop.h"
 
 using namespace std;
 
-CosineSource::CosineSource(float sampleRate, float frequency, int32_t cudaDevice, cudaStream_t cudaStream) noexcept
-    : mSampleRate(sampleRate),
+Result<Source> CosineSource::create(
+    float sampleRate,
+    float frequency,
+    ICudaCommandQueue* commandQueue,
+    IFactories* factories) noexcept {
+  auto copierFactory = factories->getCudaBufferCopierFactory();
+  Ref<IBufferCopier> copier;
+  UNWRAP_OR_FWD_RESULT(copier, copierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
+  vector<ImmutableRef<IBufferCopier>> outputBufferCopiers;
+  UNWRAP_MOVE_OR_FWD_RESULT(outputBufferCopiers, createOutputBufferCopierVector(copier.get()));
+
+  return makeRefResultNonNull<Source>(
+      new (nothrow) CosineSource(sampleRate, frequency, commandQueue, std::move(outputBufferCopiers)));
+}
+
+CosineSource::CosineSource(
+    float sampleRate,
+    float frequency,
+    ICudaCommandQueue* commandQueue,
+    std::vector<ImmutableRef<IBufferCopier>>&& outputPortBufferCopiers) noexcept
+    : BaseSource(std::move(outputPortBufferCopiers)),
+      mSampleRate(sampleRate),
       mFrequency(frequency),
       mIndexToRadiansMultiplier(static_cast<float>(2.0 * M_PI * mFrequency / mSampleRate)),
-      mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream),
+      mCommandQueue(commandQueue),
       mPhi(0.0f),
       mAlignment(32) {}
 
@@ -51,8 +71,13 @@ Status CosineSource::readOutput(IBuffer** portOutputBuffers, size_t portCount) n
   const size_t numOutputElements = output->range()->remaining() / sizeof(float);
   const float phiEnd = mPhi + static_cast<float>(numOutputElements) * mIndexToRadiansMultiplier;
 
-  SAFE_CUDA_OR_RET_STATUS(
-      gsdrCosineF(mPhi, phiEnd, output->writePtr<float>(), numOutputElements, mCudaDevice, mCudaStream));
+  SAFE_CUDA_OR_RET_STATUS(gsdrCosineF(
+      mPhi,
+      phiEnd,
+      output->writePtr<float>(),
+      numOutputElements,
+      mCommandQueue->cudaDevice(),
+      mCommandQueue->cudaStream()));
 
   mPhi = fmod(phiEnd, 2.0f * M_PIf);
 

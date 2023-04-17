@@ -29,6 +29,8 @@ enum Status_ {
   Status_InvalidState,
   Status_OutOfRange,
   Status_TimedOut,
+  Status_NotFound,
+  Status_ParseError,
 };
 
 /**
@@ -44,7 +46,7 @@ inline void throwIfError(Status status) {
       return;
 
     case Status_UnknownError:
-      throw std::runtime_error("Unknown error");
+      throw std::runtime_error("Unknown Error");
 
     case Status_OutOfMemory:
       throw std::bad_alloc();
@@ -60,6 +62,15 @@ inline void throwIfError(Status status) {
 
     case Status_OutOfRange:
       throw std::out_of_range("Out of Range");
+
+    case Status_TimedOut:
+      throw std::runtime_error("Timed Out");
+
+    case Status_NotFound:
+      throw std::runtime_error("Not Found");
+
+    case Status_ParseError:
+      throw std::runtime_error("Parse Error");
 
     default:
       throw std::runtime_error("Error type [" + std::to_string(status) + "]");

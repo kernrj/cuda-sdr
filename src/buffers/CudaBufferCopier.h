@@ -22,16 +22,16 @@
 #include <cstdint>
 
 #include "buffers/IBufferCopier.h"
+#include "commandqueue/ICudaCommandQueue.h"
 
 class CudaBufferCopier final : public IBufferCopier {
  public:
-  CudaBufferCopier(int32_t cudaDevice, cudaStream_t cudaStream, cudaMemcpyKind memcpyKind);
+  CudaBufferCopier(ICudaCommandQueue* commandQueue, cudaMemcpyKind memcpyKind);
 
   Status copy(void* dst, const void* src, size_t length) const noexcept final;
 
  private:
-  const int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
   const cudaMemcpyKind mMemcpyKind;
 
   REF_COUNTED(CudaBufferCopier);

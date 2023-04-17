@@ -16,9 +16,8 @@
 
 #include "Waiter.h"
 
-Waiter::Waiter(int32_t cudaDevice, cudaStream_t cudaStream) noexcept
-    : mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream),
+Waiter::Waiter(ICudaCommandQueue* commandQueue) noexcept
+    : mCommandQueue(commandQueue),
       mCudaEvent(nullptr),
       mNextCudaEvent(nullptr) {}
 
@@ -33,13 +32,13 @@ Waiter::~Waiter() {
 }
 
 Status Waiter::recordNextAndWaitPrevious() noexcept {
-  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCudaDevice);
+  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCommandQueue->cudaDevice());
 
   if (mNextCudaEvent == nullptr) {
     SAFE_CUDA_OR_RET_STATUS(cudaEventCreate(&mNextCudaEvent));
   }
 
-  SAFE_CUDA_OR_RET_STATUS(cudaEventRecord(mNextCudaEvent, mCudaStream));
+  SAFE_CUDA_OR_RET_STATUS(cudaEventRecord(mNextCudaEvent, mCommandQueue->cudaStream()));
 
   if (mCudaEvent != nullptr) {
     SAFE_CUDA_OR_RET_STATUS(cudaEventSynchronize(mCudaEvent));

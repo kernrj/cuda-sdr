@@ -73,6 +73,17 @@ ImmutableRef<T> unwrap(RefResult<T>&& result) {
   return value;
 }
 
+template <typename T>
+T* unwrapRaw(RefResult<T>&& result) {
+  if (result.status != Status_Success && result.value != nullptr) {
+    result.value->unref();
+  }
+
+  throwIfError(result.status);
+
+  return result.value;
+}
+
 /**
  * Returns the value from the result, or throws an exception.
  */
@@ -90,6 +101,44 @@ T unwrap(ValResult<T>&& result) {
   return result.value;
 }
 
+template <typename Out, typename In>
+inline RefResult<Out> ResultCast(const RefResult<In>& result) noexcept {
+  return {
+      .status = result.status,
+      .value = result.value,
+  };
+}
+
+template <typename Out, typename In>
+inline RefResult<Out> ResultCast(RefResult<In>&& result) noexcept {
+  return {
+      .status = result.status,
+      .value = std::move(result.value),
+  };
+}
+
+template <typename Out, typename In>
+inline ValResult<Out> ResultCast(const ValResult<In>& result) noexcept {
+  return {
+      .status = result.status,
+      .value = result.value,
+  };
+}
+
+template <typename Out, typename In>
+inline ValResult<Out> ResultCast(ValResult<In>&& result) noexcept {
+  return {
+      .status = result.status,
+      .value = std::move(result.value),
+  };
+}
+
+#define CAST_RESULT(resultCmd__)                                                        \
+  do {                                                                                  \
+    auto resultToCast__ = resultCmd__;                                                  \
+    return {.status = resultToCast__.status, .value = std::move(resultToCast__.value)}; \
+  } while (false)
+
 #define UNWRAP_OR_FWD_RESULT(assignValueToVar__, unwrapCmd__)                    \
   do {                                                                           \
     auto result__ = unwrapCmd__;                                                 \
@@ -102,6 +151,20 @@ T unwrap(ValResult<T>&& result) {
     }                                                                            \
                                                                                  \
     assignValueToVar__ = result__.value;                                         \
+  } while (false)
+
+#define UNWRAP_MOVE_OR_FWD_RESULT(assignValueToVar__, unwrapCmd__)               \
+  do {                                                                           \
+    auto result__ = unwrapCmd__;                                                 \
+    if (result__.status != Status_Success) {                                     \
+      gsloge("Error in result [%s] at %s:%d", #unwrapCmd__, __FILE__, __LINE__); \
+      return {                                                                   \
+          .status = result__.status,                                             \
+          .value = {},                                                           \
+      };                                                                         \
+    }                                                                            \
+                                                                                 \
+    assignValueToVar__ = std::move(result__.value);                              \
   } while (false)
 
 #define WARN_IF_ERR(cmdReturningStatus__)                          \

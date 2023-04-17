@@ -28,8 +28,7 @@ class CudaMemcpyFilter final : public BaseFilter {
  public:
   static Result<Filter> create(
       cudaMemcpyKind memcpyKind,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       IFactories* factories) noexcept;
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
@@ -45,7 +44,8 @@ class CudaMemcpyFilter final : public BaseFilter {
       IRelocatableResizableBufferFactory* relocatableBufferFactory,
       IBufferSliceFactory* bufferSliceFactory,
       IMemSet* memSet,
-      IBufferCopier* cudaCopier) noexcept;
+      IBufferCopier* cudaCopier,
+      std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept;
 
   REF_COUNTED(CudaMemcpyFilter);
 };

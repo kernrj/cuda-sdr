@@ -20,7 +20,7 @@
 #include <gpusdrpipeline/buffers/IBufferCopier.h>
 #include <gpusdrpipeline/filters/Filter.h>
 
-class IDriver : public Node {
+class IDriver : public virtual Node {
  public:
   IDriver* asDriver() noexcept override { return this; }
 
@@ -59,11 +59,6 @@ class IDriver : public Node {
           const char* attrVal) noexcept) noexcept = 0;
 
   virtual size_t getNodeName(Node* node, char* name, size_t nameBufLen, bool* foundOut) noexcept = 0;
-
-  [[nodiscard]] virtual Status setupSourcePort(
-      Source* source,
-      size_t sourcePort,
-      const IBufferCopier* sourceOutputMemCopier) noexcept = 0;
 
   ABSTRACT_IREF(IDriver);
 };

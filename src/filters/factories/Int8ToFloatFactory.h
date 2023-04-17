@@ -26,8 +26,21 @@ class Int8ToFloatFactory final : public ICudaFilterFactory {
   explicit Int8ToFloatFactory(IFactories* factories) noexcept
       : mFactories(factories) {}
 
-  Result<Filter> createFilter(int32_t cudaDevice, cudaStream_t cudaStream) noexcept final {
-    return Int8ToFloat::create(cudaDevice, cudaStream, mFactories);
+  Result<Node> create(const char* jsonParameters) noexcept final {
+    nlohmann::json params;
+    UNWRAP_OR_FWD_RESULT(params, parseJson(jsonParameters));
+
+    const std::string commandQueueId = params["commandQueue"];
+    Ref<ICudaCommandQueue> commandQueue;
+    UNWRAP_OR_FWD_RESULT(
+        commandQueue,
+        mFactories->getCommandQueueFactory()->getCudaCommandQueue(commandQueueId.c_str()));
+
+    return ResultCast<Node>(createFilter(commandQueue.get()));
+  }
+
+  Result<Filter> createFilter(ICudaCommandQueue* commandQueue) noexcept final {
+    return Int8ToFloat::create(commandQueue, mFactories);
   }
 
  private:

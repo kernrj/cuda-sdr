@@ -17,8 +17,13 @@
 #ifndef GPUSDRPIPELINE_MULTIPLYFACTORY_H
 #define GPUSDRPIPELINE_MULTIPLYFACTORY_H
 
+#include <nlohmann/json.hpp>
+
 #include "../Multiply.h"
 #include "Factories.h"
+#include "GSLog.h"
+#include "ParseJson.h"
+#include "commandqueue/ICudaCommandQueue.h"
 #include "filters/FilterFactories.h"
 
 class MultiplyFactory final : public ICudaFilterFactory {
@@ -26,8 +31,25 @@ class MultiplyFactory final : public ICudaFilterFactory {
   explicit MultiplyFactory(IFactories* factories)
       : mFactories(factories) {}
 
-  Result<Filter> createFilter(int32_t cudaDevice, cudaStream_t cudaStream) noexcept final {
-    return MultiplyCcc::create(cudaDevice, cudaStream, mFactories);
+  Result<Node> create(const char* jsonParameters) noexcept final {
+    DO_OR_RET_ERR_RESULT({
+      nlohmann::json parameters;
+      UNWRAP_OR_FWD_RESULT(parameters, parseJson(jsonParameters));
+
+      static const std::string commandQueueKey = "commandQueue";
+      GS_REQUIRE_OR_RET_RESULT_FMT(parameters.contains(commandQueueKey), "%s must be set", commandQueueKey.c_str());
+
+      std::string commandQueueId = parameters[commandQueueKey].get<std::string>();
+
+      Ref<ICudaCommandQueue> commandQueue;
+      UNWRAP_OR_FWD_RESULT(commandQueue, mFactories->getCommandQueueFactory()->getCudaCommandQueue(commandQueueId.c_str()));
+
+      return ResultCast<Node>(createFilter(commandQueue.get()));
+    });
+  }
+
+  Result<Filter> createFilter(ICudaCommandQueue* commandQueue) noexcept final {
+    return MultiplyCcc::create(commandQueue, mFactories);
   }
 
  private:

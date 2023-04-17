@@ -17,14 +17,13 @@
 #ifndef GPUSDRPIPELINE_PORTREMAPPINGSINKFACTORY_H
 #define GPUSDRPIPELINE_PORTREMAPPINGSINKFACTORY_H
 
-#include <filters/PortRemappingSink.h>
-
 #include "filters/FilterFactories.h"
+#include "filters/PortRemappingSink.h"
 
 class PortRemappingSinkFactory final : public IPortRemappingSinkFactory {
  public:
-  Result<IPortRemappingSink> create(Sink* mapToSink) noexcept final {
-    return makeRefResultNonNull<IPortRemappingSink>(new (std::nothrow) PortRemappingSink(mapToSink));
+  Result<IPortRemappingSink> create() noexcept final {
+    return makeRefResultNonNull<IPortRemappingSink>(new (std::nothrow) PortRemappingSink());
   }
 
   REF_COUNTED(PortRemappingSinkFactory);

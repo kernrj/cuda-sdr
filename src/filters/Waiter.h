@@ -23,6 +23,7 @@
 
 #include "CudaErrors.h"
 #include "Status.h"
+#include "commandqueue/ICudaCommandQueue.h"
 #include "util/CudaDevicePushPop.h"
 
 /**
@@ -43,14 +44,13 @@
  */
 class Waiter {
  public:
-  Waiter(int32_t cudaDevice, cudaStream_t cudaStream) noexcept;
+  Waiter(ICudaCommandQueue* commandQueue) noexcept;
   ~Waiter();
 
   [[nodiscard]] Status recordNextAndWaitPrevious() noexcept;
 
  private:
-  const int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
   cudaEvent_t mCudaEvent;
   cudaEvent_t mNextCudaEvent;
 };

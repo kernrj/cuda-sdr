@@ -24,26 +24,50 @@
 
 class CosineSourceFactory final : public ICosineSourceFactory {
  public:
+  explicit CosineSourceFactory(IFactories* factories)
+      : mFactories(factories) {}
+
+  Result<Node> create(const char* jsonParameters) noexcept final {
+    nlohmann::json params;
+    UNWRAP_OR_FWD_RESULT(params, parseJson(jsonParameters));
+
+    const std::string commandQueueId = params["commandQueue"];
+    Ref<ICudaCommandQueue> commandQueue;
+    UNWRAP_OR_FWD_RESULT(
+        commandQueue,
+        mFactories->getCommandQueueFactory()->getCudaCommandQueue(commandQueueId.c_str()));
+
+    SampleType sampleType;
+    UNWRAP_OR_FWD_RESULT(sampleType, parseSampleType(params["sampleType"]));
+
+    return ResultCast<Node>(createCosineSource(
+        sampleType,
+        params["sampleRate"],
+        params["frequency"],
+        commandQueue.get()));
+  }
+
   Result<Source> createCosineSource(
       SampleType sampleType,
       float sampleRate,
       float frequency,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept final {
+      ICudaCommandQueue* commandQueue) noexcept final {
     switch (sampleType) {
       case SampleType_FloatComplex:
-        return makeRefResultNonNull<Source>(new (std::nothrow)
-                                                ComplexCosineSource(sampleRate, frequency, cudaDevice, cudaStream));
+        return
+            ComplexCosineSource::create(sampleRate, frequency, commandQueue, mFactories);
 
       case SampleType_Float:
-        return makeRefResultNonNull<Source>(new (std::nothrow)
-                                                CosineSource(sampleRate, frequency, cudaDevice, cudaStream));
+        return CosineSource::create(sampleRate, frequency, commandQueue, mFactories);
 
       default:
         gsloge("Sample type [%u] is not supported for cosine", sampleType);
         return ERR_RESULT(Status_InvalidArgument);
     }
   }
+
+ private:
+  ConstRef<IFactories> mFactories;
 
   REF_COUNTED(CosineSourceFactory);
 };

@@ -23,10 +23,9 @@
 using namespace std;
 
 Result<IAllocator> CudaAllocatorFactory::createCudaAllocator(
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     size_t alignment,
     bool useHostMemory) noexcept {
-  IAllocator* allocator = new (nothrow) CudaAllocator(cudaDevice, cudaStream, alignment, useHostMemory);
+  IAllocator* allocator = new (nothrow) CudaAllocator(commandQueue, alignment, useHostMemory);
   return makeRefResultNonNull(allocator);
 }

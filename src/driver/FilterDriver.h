@@ -31,11 +31,8 @@ class FilterDriver final : public IFilterDriver {
 
   [[nodiscard]] Status connect(Source* source, size_t sourcePort, Sink* sink, size_t sinkPort) noexcept final;
   [[nodiscard]] Status setupNode(Node* node, const char* functionInGraph) noexcept final;
-  [[nodiscard]] Status setupSourcePort(
-      Source* source,
-      size_t sourcePort,
-      const IBufferCopier* sourceOutputMemCopier) noexcept final;
   [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final;
+  IBufferCopier* getOutputCopier(size_t port) noexcept final;
 
   void iterateOverConnections(
       void* context,

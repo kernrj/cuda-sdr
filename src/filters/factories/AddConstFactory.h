@@ -24,8 +24,24 @@ class AddConstFactory final : public IAddConstFactory {
  public:
   explicit AddConstFactory(IFactories* factories)
       : mFactories(factories) {}
-  Result<Filter> createAddConst(float addValue, int32_t cudaDevice, cudaStream_t cudaStream) noexcept final {
-    return AddConst::create(addValue, cudaDevice, cudaStream, mFactories);
+
+  Result<Node> create(const char* jsonParameters) noexcept final {
+      nlohmann::json params;
+      UNWRAP_OR_FWD_RESULT(params, parseJson(jsonParameters));
+
+      const std::string commandQueueId = params["commandQueue"];
+      Ref<ICudaCommandQueue> commandQueue;
+      UNWRAP_OR_FWD_RESULT(
+          commandQueue,
+          mFactories->getCommandQueueFactory()->getCudaCommandQueue(commandQueueId.c_str()));
+
+      return ResultCast<Node>(createAddConst(
+          params["addValue"],
+          commandQueue.get()));
+  }
+
+  Result<Filter> createAddConst(float addValue, ICudaCommandQueue* commandQueue) noexcept final {
+    return AddConst::create(addValue, commandQueue, mFactories);
   }
 
  private:

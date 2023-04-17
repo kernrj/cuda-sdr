@@ -17,6 +17,10 @@
 #ifndef GPUSDRPIPELINE_CUDAMEMCPYFILTERFACTORY_H
 #define GPUSDRPIPELINE_CUDAMEMCPYFILTERFACTORY_H
 
+#include <ParseJson.h>
+
+#include <nlohmann/json.hpp>
+
 #include "../CudaMemcpyFilter.h"
 #include "filters/FilterFactories.h"
 
@@ -25,9 +29,62 @@ class CudaMemcpyFilterFactory final : public ICudaMemcpyFilterFactory {
   explicit CudaMemcpyFilterFactory(IFactories* factories)
       : mFactories(factories) {}
 
-  Result<Filter> createCudaMemcpy(cudaMemcpyKind memcpyKind, int32_t cudaDevice, cudaStream_t cudaStream) noexcept
-      final {
-    return CudaMemcpyFilter::create(memcpyKind, cudaDevice, cudaStream, mFactories);
+  Result<Node> create(const char* jsonParameters) noexcept override {
+    nlohmann::json params;
+    UNWRAP_OR_FWD_RESULT(params, parseJson(jsonParameters));
+
+    const std::string commandQueueId = params["commandQueue"];
+    const std::string from = params["from"];
+    const std::string to = params["to"];
+
+    cudaMemcpyKind memcpyKind;
+    const std::string device = "device";
+    const std::string host = "host";
+
+    bool fromIsHost;
+    bool toIsHost;
+
+    if (from == host) {
+      fromIsHost = true;
+    } else if (from == device) {
+      fromIsHost = false;
+    } else {
+      gsloge(
+          "Unknown cuda memcpy 'from' location [%s]. Expected %s or %s.",
+          from.c_str(),
+          host.c_str(),
+          device.c_str());
+      return ERR_RESULT(Status_ParseError);
+    }
+
+    if (to == host) {
+      toIsHost = true;
+    } else if (to == device) {
+      toIsHost = false;
+    } else {
+      gsloge("Unknown cuda memcpy 'to' location [%s]. Expected %s or %s.", to.c_str(), host.c_str(), device.c_str());
+    }
+
+    if (fromIsHost && toIsHost) {
+      memcpyKind = cudaMemcpyHostToHost;
+    } else if (fromIsHost && !toIsHost) {
+      memcpyKind = cudaMemcpyHostToDevice;
+    } else if (!fromIsHost && !toIsHost) {
+      memcpyKind = cudaMemcpyDeviceToDevice;
+    } else {
+      memcpyKind = cudaMemcpyDeviceToHost;
+    }
+
+    Ref<ICudaCommandQueue> commandQueue;
+    UNWRAP_OR_FWD_RESULT(
+        commandQueue,
+        mFactories->getCommandQueueFactory()->getCudaCommandQueue(commandQueueId.c_str()));
+
+    return ResultCast<Node>(createCudaMemcpy(memcpyKind, commandQueue.get()));
+  }
+
+  Result<Filter> createCudaMemcpy(cudaMemcpyKind memcpyKind, ICudaCommandQueue* commandQueue) noexcept final {
+    return CudaMemcpyFilter::create(memcpyKind, commandQueue, mFactories);
   }
 
  private:

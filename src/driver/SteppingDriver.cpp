@@ -30,7 +30,6 @@ using namespace std;
 static string NAME_NOT_SET = "NOT SET";
 
 struct SteppingDriver::SourcePortInfo {
-  Ref<const IBufferCopier> memCopier;
   list<SinkKey> connectedSinks;
 };
 
@@ -138,14 +137,6 @@ Status SteppingDriver::connect(Source* source, size_t sourcePort, Sink* sink, si
 Status SteppingDriver::setupNode(Node* node, const char* functionInGraph) noexcept {
   DO_OR_RET_STATUS(getOrCreateNodeInfo(node)->name = functionInGraph);
 
-  return Status_Success;
-}
-
-Status SteppingDriver::setupSourcePort(
-    Source* source,
-    size_t sourcePort,
-    const IBufferCopier* sourceOutputMemCopier) noexcept {
-  DO_OR_RET_STATUS(getOrCreateSourcePortInfo(source, sourcePort)->memCopier = sourceOutputMemCopier);
   return Status_Success;
 }
 
@@ -353,7 +344,7 @@ Status SteppingDriver::doSourceOutput(const ImmutableRef<Source>& source) {
 
     auto copyToList = extraBuffersCopiedInto[sourcePort];
     for (auto& targetBuffer : copyToList) {
-      const auto& memCopier = connectionInfo->connections[sourcePort].memCopier;
+      ConstRef<IBufferCopier> memCopier = source->getOutputCopier(sourcePort);
 
       if (memCopier == nullptr) {
         gsloge(
@@ -379,19 +370,6 @@ shared_ptr<SteppingDriver::SourceConnectionInfo> SteppingDriver::getOrCreateSour
   auto it = mConnections.find(source.get());
   if (it == mConnections.end()) {
     auto insertIt = mConnections.emplace(make_pair(source.get(), make_shared<SourceConnectionInfo>(source)));
-    it = insertIt.first;
-  }
-
-  return it->second;
-}
-
-std::shared_ptr<SteppingDriver::SourcePortInfo> SteppingDriver::getOrCreateSourcePortInfo(
-    const ImmutableRef<Source>& source,
-    size_t port) {
-  SourceKey sourceKey(source, port);
-  auto it = mSourcePortInfo.find(sourceKey);
-  if (it == mSourcePortInfo.end()) {
-    auto insertIt = mSourcePortInfo.emplace(pair(sourceKey, make_shared<SourcePortInfo>()));
     it = insertIt.first;
   }
 

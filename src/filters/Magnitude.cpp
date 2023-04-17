@@ -18,6 +18,7 @@
 
 #include <cuComplex.h>
 #include <gsdr/gsdr.h>
+#include <util/util.h>
 
 #include "util/CudaDevicePushPop.h"
 
@@ -25,7 +26,7 @@ using namespace std;
 
 const size_t Magnitude::mAlignment = 32;
 
-Result<Filter> Magnitude::create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept {
+Result<Filter> Magnitude::create(ICudaCommandQueue* commandQueue, IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
   Ref<IMemSet> memSet;
@@ -33,26 +34,31 @@ Result<Filter> Magnitude::create(int32_t cudaDevice, cudaStream_t cudaStream, IF
 
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
-      factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
-  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+      factories->createRelocatableCudaBufferFactory(commandQueue, mAlignment, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(commandQueue));
+
+  auto copierFactory = factories->getCudaBufferCopierFactory();
+  Ref<IBufferCopier> copier;
+  UNWRAP_OR_FWD_RESULT(copier, copierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
+  vector<ImmutableRef<IBufferCopier>> portOutputCopiers;
+  UNWRAP_MOVE_OR_FWD_RESULT(portOutputCopiers, createOutputBufferCopierVector(copier.get()));
 
   return makeRefResultNonNull<Filter>(new (nothrow) Magnitude(
-      cudaDevice,
-      cudaStream,
+      commandQueue,
       relocatableCudaBufferFactory.get(),
       bufferSliceFactory.get(),
-      memSet.get()));
+      memSet.get(),
+      std::move(portOutputCopiers)));
 }
 
 Magnitude::Magnitude(
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IRelocatableResizableBufferFactory* relocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory,
-    IMemSet* memSet) noexcept
-    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
-      mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream) {}
+    IMemSet* memSet,
+    std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, std::move(portOutputCopiers), memSet),
+      mCommandQueue(commandQueue) {}
 
 size_t Magnitude::getOutputDataSize(size_t port) noexcept {
   GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
@@ -74,8 +80,6 @@ size_t Magnitude::getOutputSizeAlignment(size_t port) noexcept {
 Status Magnitude::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
   GS_REQUIRE_OR_RET_STATUS(portCount > 0, "One output port is required");
 
-  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCudaDevice);
-
   Ref<IBuffer> inputBuffer;
   UNWRAP_OR_FWD_STATUS(inputBuffer, getPortInputBuffer(0));
 
@@ -88,8 +92,8 @@ Status Magnitude::readOutput(IBuffer** portOutputBuffers, size_t portCount) noex
       inputBuffer->readPtr<cuComplex>(),
       outputBuffer->writePtr<float>(),
       numElements,
-      mCudaDevice,
-      mCudaStream));
+      mCommandQueue->cudaDevice(),
+      mCommandQueue->cudaStream()));
 
   const size_t readNumBytes = numElements * sizeof(cuComplex);
   const size_t writtenNumBytes = numElements * sizeof(float);

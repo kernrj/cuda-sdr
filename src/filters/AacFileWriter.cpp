@@ -185,8 +185,7 @@ Result<Sink> AacFileWriter::create(
     const char* outputFileName,
     int32_t sampleRate,
     int32_t bitRate,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IFactories* factories) noexcept {
   Ref<IAllocator> sysMemAllocator = factories->getSysMemAllocator();
   Ref<IBufferCopier> sysMemBufferCopier = factories->getSysMemCopier();
@@ -201,8 +200,7 @@ Result<Sink> AacFileWriter::create(
       outputFileName,
       sampleRate,
       bitRate,
-      cudaDevice,
-      cudaStream,
+      commandQueue,
       sysMemAllocator.get(),
       sysMemRelocatableBufferFactory.get(),
       bufferSliceFactory.get())));
@@ -212,8 +210,7 @@ AacFileWriter::AacFileWriter(
     const char* outputFileName,
     int32_t sampleRate,
     int32_t bitRate,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IAllocator* sysMemAllocator,
     IRelocatableResizableBufferFactory* sysMemRelocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory)
@@ -240,7 +237,7 @@ AacFileWriter::AacFileWriter(
       mClosedFormatCtx(false),
       mClosedCodecCtx(false),
       mSentSampleCount(0),
-      mCudaWaiter(cudaDevice, cudaStream) {
+      mCudaWaiter(commandQueue) {
   gslogd(
       "Created AAC File writer. Output file [%s] sample rate [%d] bit rate [%d]",
       outputFileName,

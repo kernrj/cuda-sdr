@@ -8,20 +8,18 @@ using namespace std;
 TEST(WhenThereAre4InputsWithDecimation2AndTwoInputCommits, ItProduces2CorrectOutputs) {
   gslogSetVerbosity(GSLOG_TRACE);
 
-  const int32_t cudaDevice = 0;
-  cudaStream_t cudaStream = nullptr;
-
   constexpr size_t tapCount = 2;
   vector<float> taps(tapCount);
   taps[0] = 0.5f;
   taps[1] = 1.0f;
 
   ConstRef<IFactories> factories = unwrap(getFactoriesSingleton());
+  ConstRef<ICudaCommandQueue> commandQueue = unwrap(factories->getCudaCommandQueueFactory()->create(0));
   auto hostToDeviceMemCopier = unwrap(
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyHostToDevice));
+      factories->getCudaBufferCopierFactory()->createBufferCopier(commandQueue, cudaMemcpyHostToDevice));
   auto deviceToHostMemCopier = unwrap(
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToHost));
-  auto cudaMemSet = unwrap(factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+      factories->getCudaBufferCopierFactory()->createBufferCopier(commandQueue, cudaMemcpyDeviceToHost));
+  auto cudaMemSet = unwrap(factories->getCudaMemSetFactory()->create(commandQueue));
 
   constexpr size_t decimation = 2;
   ConstRef<Filter> fir = unwrap(factories->getFirFactory()->createFir(
@@ -30,8 +28,7 @@ TEST(WhenThereAre4InputsWithDecimation2AndTwoInputCommits, ItProduces2CorrectOut
       decimation,
       taps.data(),
       taps.size(),
-      cudaDevice,
-      cudaStream));
+      commandQueue));
 
   /*
    * Indices 0 and 1 are used to create the first output.
@@ -64,7 +61,7 @@ TEST(WhenThereAre4InputsWithDecimation2AndTwoInputCommits, ItProduces2CorrectOut
   THROW_IF_ERR(hostToDeviceMemCopier->copy(gpuData, cpuData2, sizeof(cpuData2)));
   THROW_IF_ERR(fir->commitBuffer(0, sizeof(cpuData2)));
 
-  const auto cudaAllocator = unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(0, nullptr, 32, false));
+  const auto cudaAllocator = unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(commandQueue, 32, false));
   const auto cudaBufferFactory = unwrap(factories->createBufferFactory(cudaAllocator));
   vector<IBuffer*> outputBuffers;
   const size_t outputBufferSize = 2 * fir->getOutputDataSize(0);  // create oversized buffer, expect not-full on output.
@@ -97,9 +94,6 @@ TEST(WhenThereAre4InputsWithDecimation2AndTwoInputCommits, ItProduces2CorrectOut
 }
 
 TEST(WhenTheFirstReadCantFitAllAvailableInputs, ItDoesntSkipAnyInputValues) {
-  const int32_t cudaDevice = 0;
-  cudaStream_t cudaStream = nullptr;
-
   constexpr size_t tapCount = 3;
   vector<float> taps(tapCount);
   taps[0] = 0.5f;
@@ -107,6 +101,8 @@ TEST(WhenTheFirstReadCantFitAllAvailableInputs, ItDoesntSkipAnyInputValues) {
   taps[2] = 0.25f;
 
   ConstRef<IFactories> factories = unwrap(getFactoriesSingleton());
+  ConstRef<ICudaCommandQueue> commandQueue = unwrap(factories->getCudaCommandQueueFactory()->create(0));
+
   constexpr size_t decimation = 2;
   ConstRef<Filter> fir = unwrap(factories->getFirFactory()->createFir(
       SampleType_Float,
@@ -114,18 +110,17 @@ TEST(WhenTheFirstReadCantFitAllAvailableInputs, ItDoesntSkipAnyInputValues) {
       decimation,
       taps.data(),
       taps.size(),
-      cudaDevice,
-      cudaStream));
+      commandQueue));
 
   auto hostToDeviceMemCopier = unwrap(
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyHostToDevice));
+      factories->getCudaBufferCopierFactory()->createBufferCopier(commandQueue, cudaMemcpyHostToDevice));
   auto deviceToHostMemCopier = unwrap(
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToHost));
+      factories->getCudaBufferCopierFactory()->createBufferCopier(commandQueue, cudaMemcpyDeviceToHost));
   auto bufferSliceFactory = factories->getBufferSliceFactory();
   auto cudaAllocator = unwrap(factories->getCudaAllocatorFactory()
-                                  ->createCudaAllocator(cudaDevice, cudaStream, fir->getOutputSizeAlignment(0), false));
+                                  ->createCudaAllocator(commandQueue, fir->getOutputSizeAlignment(0), false));
   auto cudaBufferFactory = unwrap(factories->createBufferFactory(cudaAllocator));
-  auto cudaMemSet = unwrap(factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+  auto cudaMemSet = unwrap(factories->getCudaMemSetFactory()->create(commandQueue));
 
   cuComplex cpuData[] = {
       make_cuComplex(0.1f, 0.2f),

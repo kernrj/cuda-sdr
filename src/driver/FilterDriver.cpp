@@ -73,6 +73,8 @@ class SourceWrapper final : public virtual Source {
     return mSource->readOutput(portOutputBuffers, numPorts);
   }
 
+  IBufferCopier* getOutputCopier(size_t port) noexcept final { return mSource->getOutputCopier(port); }
+
  private:
   Ref<Source> mSource;
 
@@ -91,13 +93,6 @@ Status FilterDriver::connect(Source* source, size_t sourcePort, Sink* sink, size
 
 Status FilterDriver::setupNode(Node* node, const char* functionInGraph) noexcept {
   return mSteppingDriver->setupNode(node, functionInGraph);
-}
-
-Status FilterDriver::setupSourcePort(
-    Source* source,
-    size_t sourcePort,
-    const IBufferCopier* sourceOutputMemCopier) noexcept {
-  return mSteppingDriver->setupSourcePort(source, sourcePort, sourceOutputMemCopier);
 }
 
 void FilterDriver::iterateOverConnections(
@@ -295,3 +290,5 @@ size_t FilterDriver::getNodeName(Node* node, char* name, size_t nameBufLen, bool
 size_t FilterDriver::preferredInputBufferSize(size_t port) noexcept {
   return mInputDelegate->preferredInputBufferSize(port);
 }
+
+IBufferCopier* FilterDriver::getOutputCopier(size_t port) noexcept { return mOutputDelegate->getOutputCopier(port); }

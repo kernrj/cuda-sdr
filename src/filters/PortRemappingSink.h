@@ -24,17 +24,20 @@
 
 class PortRemappingSink final : public IPortRemappingSink {
  public:
-  explicit PortRemappingSink(Sink* sink) noexcept;
-
-  void addPortMapping(size_t outerPort, size_t innerPort) noexcept final;
+  void addPortMapping(size_t outerPort, Sink* innerSink, size_t innerSinkPort) noexcept final;
 
   [[nodiscard]] Result<IBuffer> requestBuffer(size_t port, size_t byteCount) noexcept final;
   [[nodiscard]] Status commitBuffer(size_t port, size_t byteCount) noexcept final;
   [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final;
 
  private:
-  ConstRef<Sink> mMapToSink;
-  std::unordered_map<size_t, size_t> mPortMap;
+  struct SinkAndPort {
+    ConstRef<Sink> sink;
+    const size_t port;
+  };
+
+ private:
+  std::unordered_map<size_t, SinkAndPort> mPortMap;
 
   REF_COUNTED(PortRemappingSink);
 };

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Rick Kern <kernrj@gmail.com>
+ * Copyright 2022-2023 Rick Kern <kernrj@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@
 
 class MultiplyCcc final : public BaseFilter {
  public:
-  static Result<Filter> create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept;
+  static Result<Filter> create(ICudaCommandQueue* commandQueue, IFactories* factories) noexcept;
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
@@ -33,16 +33,15 @@ class MultiplyCcc final : public BaseFilter {
 
  private:
   static const size_t mAlignment;
-  int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
 
  private:
   MultiplyCcc(
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       IRelocatableResizableBufferFactory* relocatableBufferFactory,
       IBufferSliceFactory* bufferSliceFactory,
-      IMemSet* memSet) noexcept;
+      IMemSet* memSet,
+      std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept;
   [[nodiscard]] size_t getAvailableNumInputElements() const;
 
   REF_COUNTED(MultiplyCcc);

@@ -14,13 +14,18 @@
  *  limitations under the License.
  */
 
-#include "RfToPcmAudio.h"
+#include "RfToPcmAudioFactory.h"
+
+#include <ParseJson.h>
+#include <util/util.h>
 
 #include <cmath>
 #include <iostream>
+#include <nlohmann/json.hpp>
 #include <vector>
 
 using namespace std;
+using namespace nlohmann;
 
 static size_t bellangerLowPassTapCount(
     float sampleRateHz,
@@ -120,23 +125,45 @@ static float getQuadDemodGain(float inputSampleRate, float channelWidth) {
   return inputSampleRate / (2.0f * M_PIf * channelWidth);
 }
 
-Result<Filter> RfToPcmAudio::create(
+RfToPcmAudioFactory::RfToPcmAudioFactory(IFactories* factories) noexcept
+    : mFactories(factories) {}
+
+Result<Node> RfToPcmAudioFactory::create(const char* jsonParameters) noexcept {
+  json params;
+  UNWRAP_OR_FWD_RESULT(params, parseJson(jsonParameters));
+
+  string modulation = params["modulation"].get<string>();
+  const float fskDeviationIfFm = modulation == "fm" ? params["fskDeviation"].get<float>() : 0.0f;
+
+  return ResultCast<Node>(createRfToPcm(
+      params["rfSampleRate"],
+      params["modulation"],
+      params["rfLowPassDecimation"],
+      params["audioLowPassDecimation"],
+      params["tunedFrequency"],
+      params["channelFrequency"],
+      params["channelWidth"],
+      fskDeviationIfFm,
+      params["rfLowPassDbAttenuation"],
+      params["audioLowPassDbAttenuation"],
+      params["commandQueue"].get<std::string>().c_str()));
+}
+
+Result<Filter> RfToPcmAudioFactory::createRfToPcm(
     float rfSampleRate,
     Modulation modulation,
-    size_t rfLowPassDecim,
-    size_t audioLowPassDecim,
-    float centerFrequency,
+    size_t rfLowPassDecimation,
+    size_t audioLowPassDecimation,
+    float tunedFrequency,
     float channelFrequency,
     float channelWidth,
-    float fskDevationIfFm,
+    float fskDeviationIfFm,
     float rfLowPassDbAttenuation,
     float audioLowPassDbAttenuation,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
-    IFactories* factories) noexcept {
+    const char* commandQueueId) noexcept {
   const float audioSampleRate =
-      rfSampleRate / static_cast<float>(rfLowPassDecim) / static_cast<float>(audioLowPassDecim);
-  const float quadDemodInputSampleRate = rfSampleRate / static_cast<float>(rfLowPassDecim);
+      rfSampleRate / static_cast<float>(rfLowPassDecimation) / static_cast<float>(audioLowPassDecimation);
+  const float quadDemodInputSampleRate = rfSampleRate / static_cast<float>(rfLowPassDecimation);
   const float rfLowPassCutoffFrequency = quadDemodInputSampleRate / 2.0f * 0.95f;
   const float rfLowPassTransitionWidth = quadDemodInputSampleRate / 2.0f * 0.05f;
   const float audioLowPassCutoffFrequency = audioSampleRate / 2.0f * 0.9f;
@@ -158,11 +185,11 @@ Result<Filter> RfToPcmAudio::create(
       audioLowPassTransitionWidth,
       audioLowPassDbAttenuation));
 
-  gslogd("CUDA device [%d] stream [%p]", cudaDevice, cudaStream);
+  gslogd("Command Queue [%s]", commandQueueId);
   gslogd(
-      "Channel frequency [%f], center frequency [%f] channel width [%f]",
+      "Channel frequency [%f], tuned frequency [%f] channel width [%f]",
       channelFrequency,
-      centerFrequency,
+      tunedFrequency,
       channelWidth);
   gslogd("RF sample rate [%f]", rfSampleRate);
   gslogd("Audio sample rate [%ld]", lrint(audioSampleRate));
@@ -171,7 +198,7 @@ Result<Filter> RfToPcmAudio::create(
       rfLowPassCutoffFrequency,
       rfLowPassTransitionWidth,
       rfLowPassDbAttenuation,
-      rfLowPassDecim,
+      rfLowPassDecimation,
       rfLowPassTaps.size());
 
   gslogd(
@@ -179,124 +206,112 @@ Result<Filter> RfToPcmAudio::create(
       audioLowPassCutoffFrequency,
       audioLowPassTransitionWidth,
       audioLowPassDbAttenuation,
-      audioLowPassDecim,
+      audioLowPassDecimation,
       audioLowPassTaps.size());
-  gslogd("Cosine source frequency [%f]", centerFrequency - channelFrequency);
+  gslogd("Cosine source frequency [%f]", tunedFrequency - channelFrequency);
   gslogd("Quad demod gain [%f]", getQuadDemodGain(quadDemodInputSampleRate, channelWidth));
 
-  Ref<IFilterDriver> driver;
-  UNWRAP_OR_FWD_RESULT(driver, factories->getFilterDriverFactory()->createFilterDriver());
+  json component = {{
+      "nodes",
+      {
+          {
+              "cosineSource",
+              {
+                  {"type", "Cosine"},
+                  {"description", "Produce a cosine signal, used to shift the signal's frequency"},
+                  {"sampleType", "FloatComplex"},
+                  {"sampleRate", rfSampleRate},
+                  {"frequency", tunedFrequency - channelFrequency},
+                  {"commandQueueId", commandQueueId},
+              },
+          },
+          {
+              "multiplyForFrequencyShift",
+              {
+                  {"type", "Multiply"},
+                  {"description", "Multiply the signal by the cosine source to shift the frequency"},
+                  {"inputSampleTypes", json::array({"ComplexFloat", "ComplexFloat"})},
+              },
+          },
+          {
+              "rfLowPassFilter",
+              {
+                  {"type", "Fir"},
+                  {"description", "Filter out higher frequencies than the shifted frequency"},
+                  {"taps", rfLowPassTaps},
+                  {"tapType", "Float"},
+                  {"signalType", "ComplexFloat"},
+                  {"decimation", rfLowPassDecimation},
+                  {"commandQueueId", commandQueueId},
+              },
+          },
+          {
+              "quadDemod",
+              {
+                  {"type", "QuadDemod"},
+                  {"description", "Demodulate the signal"},
+                  {"modulation", modulation},
+                  {"sampleRate", quadDemodInputSampleRate},
+                  {"fskDeviation", fskDeviationIfFm},
+                  {"commandQueueId", commandQueueId},
+              },
+          },
+          {
+              "audioLowPassFilter",
+              {{"type", "Fir"},
+               {"description", "Reduce the audio sample rate for output"},
+               {"taps", audioLowPassTaps},
+               {"tapType", "Float"},
+               {"signalType", "Float"},
+               {"decimation", audioLowPassDecimation},
+               {"commandQueueId", commandQueueId}},
+          },
+      },
+      {
+          "connections",
+          json::array({
+              {
+                  {"source", "cosineSource"},
+                  {"sink", "multiplyForFrequencyShift"},
+                  {"sinkPort", 1},
+              },
+              {
+                  {"source", "multiplyForFrequencyShift"},
+                  {"sink", "rfLowPassFilter"},
+              },
+              {
+                  {"source", "rfLowPassFilter"},
+                  {"sink", "quadDemod"},
+              },
+              {
+                  {"source", "quadDemod"},
+                  {"sink", "audioLowPassFilter"},
+              },
+          }),
+      },
+      {
+          "inputPorts",
+          json::array({{
+              {"exposedPort", 0},
+              {"mapped",
+               {
+                   {"node", "multiplyForFrequencyShift"},
+                   {"port", 0},
+               }},
+          }}),
+      },
+      {"outputPort", "audioLowPassFilter"},
+  }};
 
-  Ref<Source> cosineSource;
-  UNWRAP_OR_FWD_RESULT(
-      cosineSource,
-      factories->getCosineSourceFactory()->createCosineSource(
-          SampleType_FloatComplex,
-          rfSampleRate,
-          centerFrequency - channelFrequency,
-          cudaDevice,
-          cudaStream));
+  Ref<Node> componentNode;
+  UNWRAP_OR_FWD_RESULT(componentNode, createFilter("Component", component.dump().c_str()));
 
-  Ref<Filter> multiplyRfSourceByCosine;
-  UNWRAP_OR_FWD_RESULT(multiplyRfSourceByCosine, factories->getMultiplyFactory()->createFilter(cudaDevice, cudaStream));
+  ConstRef<Filter> componentFilter = componentNode->asFilter();
+  if (componentFilter == nullptr) {
+    gsloge("RF -> PCM Audio component is not a filter");
 
-  Ref<Filter> rfLowPassFilter;
-  UNWRAP_OR_FWD_RESULT(
-      rfLowPassFilter,
-      factories->getFirFactory()->createFir(
-          SampleType_Float,
-          SampleType_FloatComplex,
-          rfLowPassDecim,
-          rfLowPassTaps.data(),
-          rfLowPassTaps.size(),
-          cudaDevice,
-          cudaStream));
+    return ERR_RESULT(Status_RuntimeError);
+  }
 
-  Ref<Filter> quadDemodFilter;
-  UNWRAP_OR_FWD_RESULT(
-      quadDemodFilter,
-      factories->getQuadDemodFactory()->create(modulation, rfSampleRate, fskDevationIfFm, cudaDevice, cudaStream));
-
-  Ref<Filter> audioLowPassFilter;
-  UNWRAP_OR_FWD_RESULT(
-      audioLowPassFilter,
-      factories->getFirFactory()->createFir(
-          SampleType_Float,
-          SampleType_Float,
-          audioLowPassDecim,
-          audioLowPassTaps.data(),
-          audioLowPassTaps.size(),
-          cudaDevice,
-          cudaStream));
-
-  Ref<IPortRemappingSink> multiplyWithOnlyPort0Exposed;
-  UNWRAP_OR_FWD_RESULT(
-      multiplyWithOnlyPort0Exposed,
-      factories->getPortRemappingSinkFactory()->create(multiplyRfSourceByCosine.get()));
-  multiplyWithOnlyPort0Exposed->addPortMapping(0, 0);
-
-  driver->setDriverInput(multiplyWithOnlyPort0Exposed.get());
-  driver->setDriverOutput(audioLowPassFilter.get());
-
-  FWD_IN_RESULT_IF_ERR(driver->connect(cosineSource.get(), 0, multiplyRfSourceByCosine.get(), 1));
-  FWD_IN_RESULT_IF_ERR(driver->connect(multiplyRfSourceByCosine.get(), 0, rfLowPassFilter.get(), 0));
-  FWD_IN_RESULT_IF_ERR(driver->connect(rfLowPassFilter.get(), 0, quadDemodFilter.get(), 0));
-  FWD_IN_RESULT_IF_ERR(driver->connect(quadDemodFilter.get(), 0, audioLowPassFilter.get(), 0));
-
-  FWD_IN_RESULT_IF_ERR(
-      driver->setupNode(multiplyWithOnlyPort0Exposed.get(), "Receive RF input, send to Multiply port 0"));
-  FWD_IN_RESULT_IF_ERR(driver->setupNode(cosineSource.get(), "Produce a cosine signal"));
-  FWD_IN_RESULT_IF_ERR(driver->setupNode(multiplyRfSourceByCosine.get(), "Multiply RF input by cosine"));
-  FWD_IN_RESULT_IF_ERR(driver->setupNode(rfLowPassFilter.get(), "Shift frequency with low-pass+decimate RF signal"));
-  FWD_IN_RESULT_IF_ERR(driver->setupNode(quadDemodFilter.get(), "Demodulate FM from Quadrature input"));
-  FWD_IN_RESULT_IF_ERR(
-      driver->setupNode(audioLowPassFilter.get(), "Low-pass and decimate to output audio sample rate"));
-
-  auto rfToPcmAudio = new (nothrow) RfToPcmAudio(
-      driver.get(),
-      cosineSource.get(),
-      multiplyRfSourceByCosine.get(),
-      rfLowPassFilter.get(),
-      quadDemodFilter.get(),
-      audioLowPassFilter.get());
-
-  return makeRefResultNonNull<Filter>(rfToPcmAudio);
+  return makeRefResultNonNull(componentFilter);
 }
-
-RfToPcmAudio::RfToPcmAudio(
-    IFilterDriver* driver,
-    Source* cosineSource,
-    Filter* multiply,
-    Filter* rfLowPassFilter,
-    Filter* quadDemodFilter,
-    Filter* audioLowPassFilter) noexcept
-    : mDriver(driver),
-      mCosineSource(cosineSource),
-      mMultiplyRfSourceByCosine(multiply),
-      mRfLowPassFilter(rfLowPassFilter),
-      mQuadDemod(quadDemodFilter),
-      mAudioLowPassFilter(audioLowPassFilter) {}
-
-Result<IBuffer> RfToPcmAudio::requestBuffer(size_t port, size_t byteCount) noexcept {
-  return mDriver->requestBuffer(port, byteCount);
-}
-
-Status RfToPcmAudio::commitBuffer(size_t port, size_t byteCount) noexcept {
-  return mDriver->commitBuffer(port, byteCount);
-}
-
-size_t RfToPcmAudio::getOutputDataSize(size_t port) noexcept {
-  GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
-  return mDriver->getOutputDataSize(port);
-}
-
-size_t RfToPcmAudio::getOutputSizeAlignment(size_t port) noexcept {
-  GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
-  return mDriver->getOutputSizeAlignment(port);
-}
-
-Status RfToPcmAudio::readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept {
-  return mDriver->readOutput(portOutputBuffers, numPorts);
-}
-
-size_t RfToPcmAudio::preferredInputBufferSize(size_t port) noexcept { return 1 << 20; }

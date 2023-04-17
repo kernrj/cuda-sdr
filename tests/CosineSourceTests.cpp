@@ -6,25 +6,25 @@
 using namespace std;
 
 TEST(WhenCosineSourceOutputs, ItMatchesCpuCalculations) {
-  const int32_t cudaDevice = 0;
   cudaStream_t cudaStream = nullptr;
   ConstRef<IFactories> factories = unwrap(getFactoriesSingleton());
 
   const size_t sampleRate = 100;
   const float frequency = 1.0f;
 
+  ConstRef<ICudaCommandQueue> commandQueue = unwrap(factories->getCudaCommandQueueFactory()->create(0));
   const auto cosineSource =
       unwrap(factories->getCosineSourceFactory()
-                 ->createCosineSource(SampleType_FloatComplex, sampleRate, frequency, cudaDevice, cudaStream));
+                 ->createCosineSource(SampleType_FloatComplex, sampleRate, frequency, commandQueue));
   auto hostToDeviceMemCopier = unwrap(
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyHostToDevice));
+      factories->getCudaBufferCopierFactory()->createBufferCopier(commandQueue, cudaMemcpyHostToDevice));
   auto deviceToHostMemCopier = unwrap(
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToHost));
-  auto cudaMemSet = unwrap(factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+      factories->getCudaBufferCopierFactory()->createBufferCopier(commandQueue, cudaMemcpyDeviceToHost));
+  auto cudaMemSet = unwrap(factories->getCudaMemSetFactory()->create(commandQueue));
   const auto cudaHostAllocator =
-      unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, 32, true));
+      unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(commandQueue, 32, true));
   const auto cudaGpuAllocator =
-      unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, 32, false));
+      unwrap(factories->getCudaAllocatorFactory()->createCudaAllocator(commandQueue, 32, false));
   const auto cudaGpuBufferFactory = unwrap(factories->createBufferFactory(cudaGpuAllocator));
   const auto cudaHostBufferFactory = unwrap(factories->createBufferFactory(cudaHostAllocator));
   vector<IBuffer*> outputBuffers;

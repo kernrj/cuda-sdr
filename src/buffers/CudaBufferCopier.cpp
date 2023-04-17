@@ -19,9 +19,8 @@
 #include "Result.h"
 #include "util/CudaDevicePushPop.h"
 
-CudaBufferCopier::CudaBufferCopier(int32_t cudaDevice, cudaStream_t cudaStream, cudaMemcpyKind memcpyKind)
-    : mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream),
+CudaBufferCopier::CudaBufferCopier(ICudaCommandQueue* commandQueue, cudaMemcpyKind memcpyKind)
+    : mCommandQueue(commandQueue),
       mMemcpyKind(memcpyKind) {}
 
 Status CudaBufferCopier::copy(void* dst, const void* src, size_t length) const noexcept {
@@ -35,8 +34,8 @@ Status CudaBufferCopier::copy(void* dst, const void* src, size_t length) const n
     return Status_InvalidArgument;
   }
 
-  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCudaDevice);
-  SAFE_CUDA_OR_RET_STATUS(cudaMemcpyAsync(dst, src, length, mMemcpyKind, mCudaStream));
+  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCommandQueue->cudaDevice());
+  SAFE_CUDA_OR_RET_STATUS(cudaMemcpyAsync(dst, src, length, mMemcpyKind, mCommandQueue->cudaStream()));
 
   return Status_Success;
 }

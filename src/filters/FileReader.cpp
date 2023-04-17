@@ -23,9 +23,17 @@
 
 using namespace std;
 
-FileReader::FileReader(const char* fileName) noexcept
-    : mFileName(fileName),
-      mFile(fopen64(fileName, "rb")) {
+Result<Source> FileReader::create(const std::string& fileName, IFactories* factories) {
+  vector<ImmutableRef<IBufferCopier>> portOutputCopier = {factories->getSysMemCopier()};
+  return makeRefResultNonNull<Source>(new(nothrow) FileReader(fileName, std::move(portOutputCopier)));
+}
+
+FileReader::FileReader(
+    const string& fileName,
+    std::vector<ImmutableRef<IBufferCopier>>&& outputPortBufferCopiers) noexcept
+    : BaseSource(std::move(outputPortBufferCopiers)),
+      mFileName(fileName),
+      mFile(fopen64(fileName.c_str(), "rb")) {
   if (mFile == nullptr) {
     GS_FAIL("Failed to open file [" << fileName << "]: Error [" << errno << "]: " << strerror(errno));
   }

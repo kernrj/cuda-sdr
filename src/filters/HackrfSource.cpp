@@ -50,12 +50,15 @@ Result<IHackrfSource> HackrfSource::create(
       bufferPoolFactory,
       factories->createBufferPoolFactory(maxBufferCountBeforeDropping, sysMemBufferFactory.get()));
 
+  vector<ImmutableRef<IBufferCopier>> portOutputCopier = {factories->getSysMemCopier()};
+
   return makeRefResultNonNull<IHackrfSource>(new (nothrow) HackrfSource(
       frequency,
       sampleRate,
       bufferPoolFactory.get(),
       factories->getSysMemCopier(),
-      factories->getBufferUtil()));
+      factories->getBufferUtil(),
+      std::move(portOutputCopier)));
 }
 
 HackrfSource::HackrfSource(
@@ -63,8 +66,10 @@ HackrfSource::HackrfSource(
     double sampleRate,
     IBufferPoolFactory* bufferPoolFactory,
     IBufferCopier* outputBufferCopier,
-    IBufferUtil* bufferUtil) noexcept
-    : mFrequency(frequency),
+    IBufferUtil* bufferUtil,
+    std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept
+    : BaseSource(std::move(portOutputCopiers)),
+      mFrequency(frequency),
       mSampleRate(sampleRate),
       mBufferPoolFactory(bufferPoolFactory),
       mOutputBufferCopier(outputBufferCopier),

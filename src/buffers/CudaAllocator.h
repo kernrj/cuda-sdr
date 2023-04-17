@@ -20,16 +20,16 @@
 #include <cuda_runtime.h>
 
 #include "buffers/IAllocator.h"
+#include "commandqueue/ICudaCommandQueue.h"
 
 class CudaAllocator final : public IAllocator {
  public:
-  CudaAllocator(int32_t cudaDevice, cudaStream_t cudaStream, size_t alignment, bool useHostMemory) noexcept;
+  CudaAllocator(ICudaCommandQueue* commandQueue, size_t alignment, bool useHostMemory) noexcept;
 
   Result<IMemory> allocate(size_t size) noexcept final;
 
  private:
-  const int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
   const size_t mAlignment;
   const bool mUseHostMemory;
 

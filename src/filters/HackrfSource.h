@@ -31,9 +31,10 @@
 
 #include "Factories.h"
 #include "HackrfSession.h"
+#include "filters/BaseSource.h"
 #include "filters/IHackrfSource.h"
 
-class HackrfSource final : public IHackrfSource {
+class HackrfSource final : public IHackrfSource, public BaseSource {
  public:
   static Result<IHackrfSource> create(
       uint64_t frequency,
@@ -83,7 +84,8 @@ class HackrfSource final : public IHackrfSource {
       double sampleRate,
       IBufferPoolFactory* bufferPoolFactory,
       IBufferCopier* outputBufferCopier,
-      IBufferUtil* bufferUtil) noexcept;
+      IBufferUtil* bufferUtil,
+      std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept;
 
   static int rxCallbackWrapper(hackrf_transfer* transfer) noexcept;
   int rxCallback(hackrf_transfer* transfer) noexcept;

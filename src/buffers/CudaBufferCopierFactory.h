@@ -21,8 +21,7 @@
 class CudaBufferCopierFactory final : public ICudaBufferCopierFactory {
  public:
   Result<IBufferCopier> createBufferCopier(
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       cudaMemcpyKind memcpyKind) noexcept final;
 
   REF_COUNTED(CudaBufferCopierFactory);

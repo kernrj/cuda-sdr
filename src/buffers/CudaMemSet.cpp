@@ -18,13 +18,12 @@
 
 #include "util/CudaDevicePushPop.h"
 
-CudaMemSet::CudaMemSet(int32_t cudaDevice, cudaStream_t cudaStream)
-    : mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream) {}
+CudaMemSet::CudaMemSet(ICudaCommandQueue* commandQueue)
+    : mCommandQueue(commandQueue) {}
 
 Status CudaMemSet::memSet(void* data, uint8_t value, size_t byteCount) noexcept {
-  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCudaDevice);
-  SAFE_CUDA_OR_RET_STATUS(cudaMemsetAsync(data, value, byteCount, mCudaStream));
+  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCommandQueue->cudaDevice());
+  SAFE_CUDA_OR_RET_STATUS(cudaMemsetAsync(data, value, byteCount, mCommandQueue->cudaStream()));
 
   return Status_Success;
 }

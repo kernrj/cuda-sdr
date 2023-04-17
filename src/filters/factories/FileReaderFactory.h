@@ -17,16 +17,29 @@
 #ifndef GPUSDRPIPELINE_FILEREADERFACTORY_H
 #define GPUSDRPIPELINE_FILEREADERFACTORY_H
 
+#include <nlohmann/json.hpp>
+
 #include "../FileReader.h"
 #include "Factories.h"
 #include "filters/FilterFactories.h"
 
 class FileReaderFactory final : public IFileReaderFactory {
  public:
-  Result<Source> createFileReader(const char* fileName) noexcept final {
-    DO_OR_RET_ERR_RESULT(return makeRefResultNonNull<Source>(new (std::nothrow) FileReader(fileName)));
+  explicit FileReaderFactory(IFactories* factories) noexcept
+      : mFactories(factories) {}
+
+  Result<Node> create(const char* jsonParameters) noexcept override {
+    const auto obj = nlohmann::json::parse(jsonParameters);
+
+    return ResultCast<Node>(FileReader::create(obj["filename"], mFactories));
   }
 
+  Result<Source> createFileReader(const char* fileName) noexcept final {
+    return FileReader::create(fileName, mFactories);
+  }
+
+ private:
+  ConstRef<IFactories> mFactories;
   REF_COUNTED(FileReaderFactory);
 };
 

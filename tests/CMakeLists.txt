@@ -20,7 +20,6 @@ add_executable(
     ${TEST_PROJECT_NAME}
     CosineSourceTests.cpp
     FirTests.cpp
-    SteppingDriverTest.cpp
 )
 
 proj_set_default_warning_flags(${TEST_TARGET_NAME} PRIVATE)

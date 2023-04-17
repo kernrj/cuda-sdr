@@ -18,6 +18,7 @@
 
 #include <cuComplex.h>
 #include <gsdr/gsdr.h>
+#include <util/util.h>
 
 #include <stdexcept>
 
@@ -49,8 +50,7 @@ Result<Filter> Fir::create(
     size_t decimation,
     const float* taps,
     size_t tapCount,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IFactories* factories) noexcept {
   Ref<IAllocator> allocator;
   Ref<IBufferCopier> deviceToDeviceBufferCopier;
@@ -60,29 +60,35 @@ Result<Filter> Fir::create(
 
   UNWRAP_OR_FWD_RESULT(
       allocator,
-      factories->getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, mAlignment, false));
+      factories->getCudaAllocatorFactory()->createCudaAllocator(commandQueue, mAlignment, false));
   UNWRAP_OR_FWD_RESULT(
       deviceToDeviceBufferCopier,
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToDevice));
+      factories->getCudaBufferCopierFactory()->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
   UNWRAP_OR_FWD_RESULT(
       hostToDeviceBufferCopier,
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyHostToDevice));
-  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+      factories->getCudaBufferCopierFactory()->createBufferCopier(commandQueue, cudaMemcpyHostToDevice));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(commandQueue));
   UNWRAP_OR_FWD_RESULT(
       relocatableBufferFactory,
       factories->createRelocatableResizableBufferFactory(allocator.get(), deviceToDeviceBufferCopier.get()));
+
+  auto copierFactory = factories->getCudaBufferCopierFactory();
+  Ref<IBufferCopier> copier;
+  UNWRAP_OR_FWD_RESULT(copier, copierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
+  vector<ImmutableRef<IBufferCopier>> portOutputCopiers;
+  UNWRAP_MOVE_OR_FWD_RESULT(portOutputCopiers, createOutputBufferCopierVector(copier.get()));
 
   Fir* fir = new (nothrow)
       Fir(tapType,
           elementType,
           decimation,
-          cudaDevice,
-          cudaStream,
+          commandQueue,
           allocator.get(),
           hostToDeviceBufferCopier.get(),
           relocatableBufferFactory.get(),
           factories->getBufferSliceFactory(),
-          memSet.get());
+          memSet.get(),
+          std::move(portOutputCopiers));
   NON_NULL_OR_RET(fir);
 
   Status status = fir->setTaps(taps, tapCount);
@@ -98,33 +104,34 @@ Fir::Fir(
     SampleType tapType,
     SampleType elementType,
     size_t decimation,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IAllocator* allocator,
     IBufferCopier* hostToDeviceBufferCopier,
     IRelocatableResizableBufferFactory* relocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory,
-    IMemSet* memSet) noexcept
-    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
+    IMemSet* memSet,
+    std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, std::move(portOutputCopiers), memSet),
       mTapType(tapType),
       mElementType(elementType),
       mAllocator(allocator),
       mHostToDeviceBufferCopier(hostToDeviceBufferCopier),
       mDecimation(max(static_cast<size_t>(1), decimation)),
       mTapCount(0),
-      mCudaStream(cudaStream),
-      mCudaDevice(cudaDevice),
+      mCommandQueue(commandQueue),
       mElementSize(getSampleSize(elementType)) {}
 
 Status Fir::setTaps(const float* tapsReversed, size_t tapCount) noexcept {
-  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCudaDevice);
-
   if (mTapCount < tapCount) {
     UNWRAP_OR_FWD_STATUS(mTaps, mAllocator->allocate(tapCount * sizeof(float)));
   }
 
+  GS_REQUIRE_OR_RET_STATUS(tapsReversed != nullptr || tapCount == 0, "tapsReversed must be non-null when tapCount > 0");
+
   const size_t bufferLength = tapCount * getSampleSize(mTapType);
-  FWD_IF_ERR(mHostToDeviceBufferCopier->copy(mTaps->data(), tapsReversed, bufferLength));
+  if (tapCount > 0) {
+    FWD_IF_ERR(mHostToDeviceBufferCopier->copy(mTaps->data(), tapsReversed, bufferLength));
+  }
 
   mTapCount = static_cast<int32_t>(tapCount);
 
@@ -227,8 +234,8 @@ Status Fir::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
         inputBuffer->readPtr<float>(),
         outputBuffer->writePtr<float>(),
         numOutputs,
-        mCudaDevice,
-        mCudaStream));
+        mCommandQueue->cudaDevice(),
+        mCommandQueue->cudaStream()));
   } else if (mTapType == SampleType_Float && mElementType == SampleType_FloatComplex) {
     SAFE_CUDA_OR_RET_STATUS(gsdrFirFC(
         mDecimation,
@@ -237,8 +244,8 @@ Status Fir::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
         inputBuffer->readPtr<cuComplex>(),
         outputBuffer->writePtr<cuComplex>(),
         numOutputs,
-        mCudaDevice,
-        mCudaStream));
+        mCommandQueue->cudaDevice(),
+        mCommandQueue->cudaStream()));
   } else if (mTapType == SampleType_FloatComplex && mElementType == SampleType_FloatComplex) {
     SAFE_CUDA_OR_RET_STATUS(gsdrFirCC(
         mDecimation,
@@ -247,8 +254,8 @@ Status Fir::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
         inputBuffer->readPtr<cuComplex>(),
         outputBuffer->writePtr<cuComplex>(),
         numOutputs,
-        mCudaDevice,
-        mCudaStream));
+        mCommandQueue->cudaDevice(),
+        mCommandQueue->cudaStream()));
   } else if (mTapType == SampleType_FloatComplex && mElementType == SampleType_Float) {
     SAFE_CUDA_OR_RET_STATUS(gsdrFirCF(
         mDecimation,
@@ -257,8 +264,8 @@ Status Fir::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
         inputBuffer->readPtr<float>(),
         outputBuffer->writePtr<cuComplex>(),
         numOutputs,
-        mCudaDevice,
-        mCudaStream));
+        mCommandQueue->cudaDevice(),
+        mCommandQueue->cudaStream()));
   }
 
   const size_t numOutputBytes = numOutputs * mElementSize;

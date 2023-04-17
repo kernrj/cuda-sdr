@@ -16,28 +16,41 @@
 
 #include "PortRemappingSink.h"
 
-PortRemappingSink::PortRemappingSink(Sink* sink) noexcept
-    : mMapToSink(sink) {}
-
-void PortRemappingSink::addPortMapping(size_t outerPort, size_t innerPort) noexcept { mPortMap[outerPort] = innerPort; }
+void PortRemappingSink::addPortMapping(size_t outerPort, Sink* innerSink, size_t innerSinkPort) noexcept {
+  mPortMap.emplace(outerPort, SinkAndPort {innerSink, innerSinkPort});
+}
 
 Result<IBuffer> PortRemappingSink::requestBuffer(size_t port, size_t byteCount) noexcept {
-  GS_REQUIRE_OR_RET_RESULT_FMT(mPortMap.find(port) != mPortMap.end(), "Input port [%zu] is not mapped", port);
+  auto it = mPortMap.find(port);
 
-  size_t innerPort = mPortMap[port];
-  return mMapToSink->requestBuffer(innerPort, byteCount);
+  GS_REQUIRE_OR_RET_RESULT_FMT(it != mPortMap.end(), "Input port [%zu] is not mapped", port);
+
+  auto sink = it->second.sink;
+  auto innerPort = it->second.port;
+
+  return sink->requestBuffer(innerPort, byteCount);
 }
 
 Status PortRemappingSink::commitBuffer(size_t port, size_t byteCount) noexcept {
-  GS_REQUIRE_OR_RET_STATUS_FMT(mPortMap.find(port) != mPortMap.end(), "Input port [%zu] is not mapped", port);
+  auto it = mPortMap.find(port);
 
-  size_t innerPort = mPortMap[port];
-  FWD_IF_ERR(mMapToSink->commitBuffer(innerPort, byteCount));
+  GS_REQUIRE_OR_RET_STATUS_FMT(it != mPortMap.end(), "Input port [%zu] is not mapped", port);
+
+  auto sink = it->second.sink;
+  auto innerPort = it->second.port;
+
+  FWD_IF_ERR(sink->commitBuffer(innerPort, byteCount));
 
   return Status_Success;
 }
 
 size_t PortRemappingSink::preferredInputBufferSize(size_t port) noexcept {
-  GS_REQUIRE_OR_ABORT(mPortMap.find(port) != mPortMap.end(), "Port not found");
-  return mMapToSink->preferredInputBufferSize(mPortMap[port]);
+  auto it = mPortMap.find(port);
+
+  GS_REQUIRE_OR_ABORT(it != mPortMap.end(), "Port not found");
+
+  auto sink = it->second.sink;
+  auto innerPort = it->second.port;
+
+  return sink->preferredInputBufferSize(innerPort);
 }

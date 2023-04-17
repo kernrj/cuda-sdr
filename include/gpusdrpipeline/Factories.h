@@ -30,6 +30,8 @@
 #include <gpusdrpipeline/buffers/IRelocatableCudaBufferFactory.h>
 #include <gpusdrpipeline/buffers/IRelocatableResizableBufferFactory.h>
 #include <gpusdrpipeline/buffers/IResizableBufferFactory.h>
+#include <gpusdrpipeline/commandqueue/ICommandQueueFactory.h>
+#include <gpusdrpipeline/commandqueue/ICudaCommandQueueFactory.h>
 #include <gpusdrpipeline/driver/IDriver.h>
 #include <gpusdrpipeline/driver/IDriverToDiagramFactory.h>
 #include <gpusdrpipeline/driver/IFilterDriverFactory.h>
@@ -62,10 +64,13 @@ class IFactories : public virtual IRef {
   [[nodiscard]] virtual ISteppingDriverFactory* getSteppingDriverFactory() noexcept = 0;
   [[nodiscard]] virtual IFilterDriverFactory* getFilterDriverFactory() noexcept = 0;
   [[nodiscard]] virtual IPortRemappingSinkFactory* getPortRemappingSinkFactory() noexcept = 0;
+  [[nodiscard]] virtual IPortRemappingSourceFactory* getPortRemappingSourceFactory() noexcept = 0;
   [[nodiscard]] virtual IRfToPcmAudioFactory* getRfToPcmAudioFactory() noexcept = 0;
   [[nodiscard]] virtual IReadByteCountMonitorFactory* getReadByteCountMonitorFactory() noexcept = 0;
   [[nodiscard]] virtual IDriverToDiagramFactory* getDriverToDotFactory() noexcept = 0;
   [[nodiscard]] virtual IBufferRangeFactory* getBufferRangeFactory() noexcept = 0;
+  [[nodiscard]] virtual ICommandQueueFactory* getCommandQueueFactory() noexcept = 0;
+  [[nodiscard]] virtual ICudaCommandQueueFactory* getCudaCommandQueueFactory() noexcept = 0;
 
   [[nodiscard]] virtual Result<IBufferFactory> createBufferFactory(IAllocator* allocator) noexcept = 0;
 
@@ -87,8 +92,7 @@ class IFactories : public virtual IRef {
   }
 
   [[nodiscard]] virtual Result<IRelocatableResizableBufferFactory> createRelocatableCudaBufferFactory(
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       size_t cudaAlignment,
       bool useHostMemory) noexcept {
     ConstRef<ICudaBufferCopierFactory> cudaBufferCopierFactory = getCudaBufferCopierFactory();
@@ -97,10 +101,10 @@ class IFactories : public virtual IRef {
 
     UNWRAP_OR_FWD_RESULT(
         cudaAllocator,
-        getCudaAllocatorFactory()->createCudaAllocator(cudaDevice, cudaStream, cudaAlignment, useHostMemory));
+        getCudaAllocatorFactory()->createCudaAllocator(commandQueue, cudaAlignment, useHostMemory));
     UNWRAP_OR_FWD_RESULT(
         cudaMemCopier,
-        cudaBufferCopierFactory->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToDevice));
+        cudaBufferCopierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
 
     return createRelocatableResizableBufferFactory(cudaAllocator.get(), cudaMemCopier.get());
   }

@@ -30,20 +30,19 @@ RelocatableCudaBufferFactory::RelocatableCudaBufferFactory(
 
 Result<IRelocatableResizableBuffer> RelocatableCudaBufferFactory::createCudaBuffer(
     size_t minSize,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     size_t alignment,
     bool useHostMemory) noexcept {
   Ref<IAllocator> cudaAllocator;
 
   UNWRAP_OR_FWD_RESULT(
       cudaAllocator,
-      mAllocatorFactory->createCudaAllocator(cudaDevice, cudaStream, alignment, useHostMemory));
+      mAllocatorFactory->createCudaAllocator(commandQueue, alignment, useHostMemory));
 
   Ref<IBufferCopier> cudaBufferCopier;
   UNWRAP_OR_FWD_RESULT(
       cudaBufferCopier,
-      mCudaBufferCopierFactory->createBufferCopier(cudaDevice, cudaStream, cudaMemcpyDeviceToDevice));
+      mCudaBufferCopierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
 
   return RelocatableResizableBuffer::create(minSize, cudaAllocator.get(), cudaBufferCopier.get(), mBufferRangeFactory);
 }

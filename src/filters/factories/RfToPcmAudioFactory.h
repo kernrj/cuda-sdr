@@ -14,51 +14,37 @@
  *  limitations under the License.
  */
 
-#ifndef GPUSDRPIPELINE_RFTOPCMAUDIOFACTORY_H
-#define GPUSDRPIPELINE_RFTOPCMAUDIOFACTORY_H
+#ifndef GPUSDRPIPELINE_RFTOPCMAUDIO_H
+#define GPUSDRPIPELINE_RFTOPCMAUDIO_H
 
-#include <filters/RfToPcmAudio.h>
+#include <remez/remez.h>
 
 #include "Factories.h"
-#include "filters/FilterFactories.h"
+#include "Modulation.h"
 
 class RfToPcmAudioFactory final : public IRfToPcmAudioFactory {
  public:
-  explicit RfToPcmAudioFactory(IFactories* factories)
-      : mFactories(factories) {}
+  explicit RfToPcmAudioFactory(IFactories* factories) noexcept;
 
-  Result<Filter> create(
+  Result<Node> create(const char* jsonParameters) noexcept final;
+
+  Result<Filter> createRfToPcm(
       float rfSampleRate,
       Modulation modulation,
-      size_t rfLowPassDecim,
-      size_t audioLowPassDecim,
+      size_t rfLowPassDecimation,
+      size_t audioLowPassDecimation,
       float centerFrequency,
       float channelFrequency,
       float channelWidth,
-      float fskDevationIfFm,
+      float fskDeviationIfFm,
       float rfLowPassDbAttenuation,
       float audioLowPassDbAttenuation,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept final {
-    return RfToPcmAudio::create(
-        rfSampleRate,
-        modulation,
-        rfLowPassDecim,
-        audioLowPassDecim,
-        centerFrequency,
-        channelFrequency,
-        channelWidth,
-        fskDevationIfFm,
-        rfLowPassDbAttenuation,
-        audioLowPassDbAttenuation,
-        cudaDevice,
-        cudaStream,
-        mFactories);
-  }
+      const char* commandQueueId) noexcept final;
 
  private:
   ConstRef<IFactories> mFactories;
 
   REF_COUNTED(RfToPcmAudioFactory);
 };
+
 #endif  // GPUSDRPIPELINE_RFTOPCMAUDIOFACTORY_H

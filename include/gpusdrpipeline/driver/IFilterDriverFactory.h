@@ -18,8 +18,9 @@
 #define GPUSDRPIPELINE_IFILTERDRIVERFACTORY_H
 
 #include <gpusdrpipeline/driver/IFilterDriver.h>
+#include <gpusdrpipeline/filters/FilterFactories.h>
 
-class IFilterDriverFactory : public virtual IRef {
+class IFilterDriverFactory : public INodeFactory {
  public:
   [[nodiscard]] virtual Result<IFilterDriver> createFilterDriver() noexcept = 0;
 

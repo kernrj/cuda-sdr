@@ -18,6 +18,7 @@
 
 #include <cuda_runtime_api.h>
 #include <gsdr/conversion.h>
+#include <util/util.h>
 
 #include <cstdint>
 
@@ -28,31 +29,39 @@ using namespace std;
 
 const size_t Int8ToFloat::mAlignment = 32;
 
-Result<Filter> Int8ToFloat::create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept {
+Result<Filter> Int8ToFloat::create(ICudaCommandQueue* commandQueue, IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
   Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
 
+  auto copierFactory = factories->getCudaBufferCopierFactory();
+  Ref<IBufferCopier> copier;
+  UNWRAP_OR_FWD_RESULT(copier, copierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
+  vector<ImmutableRef<IBufferCopier>> outputBufferCopiers;
+  UNWRAP_MOVE_OR_FWD_RESULT(outputBufferCopiers, createOutputBufferCopierVector(copier.get()));
+
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
-      factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
-  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+      factories->createRelocatableCudaBufferFactory(commandQueue, mAlignment, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(commandQueue));
 
-  return makeRefResultNonNull<Filter>(
-      new (nothrow)
-          Int8ToFloat(cudaDevice, cudaStream, relocatableCudaBufferFactory.get(), bufferSliceFactory, memSet.get()));
+  return makeRefResultNonNull<Filter>(new (nothrow) Int8ToFloat(
+      commandQueue,
+      relocatableCudaBufferFactory.get(),
+      bufferSliceFactory,
+      memSet.get(),
+      std::move(outputBufferCopiers)));
 }
 
 Int8ToFloat::Int8ToFloat(
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IRelocatableResizableBufferFactory* relocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory,
-    IMemSet* memSet) noexcept
-    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
-      mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream) {}
+    IMemSet* memSet,
+    vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, std::move(portOutputCopiers), memSet),
+      mCommandQueue(commandQueue) {}
 
 size_t Int8ToFloat::getOutputDataSize(size_t port) noexcept {
   GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Port [%zu] is out of range", port);
@@ -81,8 +90,8 @@ Status Int8ToFloat::readOutput(IBuffer** portOutputBuffers, size_t portCount) no
       inputBuffer->readPtr<int8_t>(),
       outputBuffer->writePtr<float>(),
       elementCount,
-      mCudaDevice,
-      mCudaStream));
+      mCommandQueue->cudaDevice(),
+      mCommandQueue->cudaStream()));
 
   FWD_IF_ERR(outputBuffer->range()->increaseEndOffset(elementCount * sizeof(float)));
   FWD_IF_ERR(consumeInputBytesAndMoveUsedToStart(0, elementCount * sizeof(int8_t)));

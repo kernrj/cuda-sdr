@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Rick Kern <kernrj@gmail.com>
+ * Copyright 2022-2023 Rick Kern <kernrj@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@
 #include <cuComplex.h>
 #include <cuda.h>
 #include <gsdr/gsdr.h>
+#include <util/util.h>
 
 #include "Factories.h"
 #include "util/CudaDevicePushPop.h"
@@ -27,34 +28,39 @@ using namespace std;
 
 const size_t MultiplyCcc::mAlignment = 32;
 
-Result<Filter> MultiplyCcc::create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept {
+Result<Filter> MultiplyCcc::create(ICudaCommandQueue* commandQueue, IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
   Ref<IMemSet> memSet;
   Ref<IRelocatableResizableBufferFactory> relocatableResizableBufferFactory;
 
-  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(commandQueue));
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
-      factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
+      factories->createRelocatableCudaBufferFactory(commandQueue, mAlignment, false));
+
+  auto copierFactory = factories->getCudaBufferCopierFactory();
+  Ref<IBufferCopier> copier;
+  UNWRAP_OR_FWD_RESULT(copier, copierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
+  vector<ImmutableRef<IBufferCopier>> portOutputCopiers;
+  UNWRAP_MOVE_OR_FWD_RESULT(portOutputCopiers, createOutputBufferCopierVector(copier.get()));
 
   return makeRefResultNonNull<Filter>(new (nothrow) MultiplyCcc(
-      cudaDevice,
-      cudaStream,
+      commandQueue,
       relocatableCudaBufferFactory.get(),
       bufferSliceFactory.get(),
-      memSet.get()));
+      memSet.get(),
+      std::move(portOutputCopiers)));
 }
 
 MultiplyCcc::MultiplyCcc(
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IRelocatableResizableBufferFactory* relocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory,
-    IMemSet* memSet) noexcept
-    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 2, memSet),
-      mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream) {}
+    IMemSet* memSet,
+    std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 2, std::move(portOutputCopiers), memSet),
+      mCommandQueue(commandQueue) {}
 
 size_t MultiplyCcc::getOutputDataSize(size_t port) noexcept {
   GS_REQUIRE_OR_RET_FMT(port == 0, 0, "Port [%zu] is out of range", port);
@@ -125,7 +131,6 @@ size_t MultiplyCcc::preferredInputBufferSize(size_t port) noexcept {
 
 Status MultiplyCcc::readOutput(IBuffer** portOutputBuffers, size_t portCount) noexcept {
   GS_REQUIRE_OR_RET_STATUS(portCount != 0, "One output port is required");
-  CUDA_DEV_PUSH_POP_OR_RET_STATUS(mCudaDevice);
 
   const size_t numInputElements = getAvailableNumInputElements();
   const auto& outputBuffer = portOutputBuffers[0];
@@ -142,8 +147,8 @@ Status MultiplyCcc::readOutput(IBuffer** portOutputBuffers, size_t portCount) no
       inputBuffer1->readPtr<cuComplex>(),
       portOutputBuffers[0]->writePtr<cuComplex>(),
       numElements,
-      mCudaDevice,
-      mCudaStream);
+      mCommandQueue->cudaDevice(),
+      mCommandQueue->cudaStream());
 
   const size_t writtenNumBytes = numElements * sizeof(cuComplex);
   FWD_IF_ERR(outputBuffer->range()->increaseEndOffset(writtenNumBytes));

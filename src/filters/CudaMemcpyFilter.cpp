@@ -16,6 +16,8 @@
 
 #include "CudaMemcpyFilter.h"
 
+#include <util/util.h>
+
 #include <cstring>
 #include <string>
 
@@ -29,8 +31,7 @@ static bool isInputHostMemory(cudaMemcpyKind memcpyKind) noexcept {
 
 Result<Filter> CudaMemcpyFilter::create(
     cudaMemcpyKind memcpyKind,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
@@ -41,28 +42,35 @@ Result<Filter> CudaMemcpyFilter::create(
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
       factories->createRelocatableCudaBufferFactory(
-          cudaDevice,
-          cudaStream,
+          commandQueue,
           32,
           /*useHostMemory=*/isInputHostMemory(memcpyKind)));
-  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(commandQueue));
   UNWRAP_OR_FWD_RESULT(
       cudaCopier,
-      factories->getCudaBufferCopierFactory()->createBufferCopier(cudaDevice, cudaStream, memcpyKind));
+      factories->getCudaBufferCopierFactory()->createBufferCopier(commandQueue, memcpyKind));
+
+  auto copierFactory = factories->getCudaBufferCopierFactory();
+  Ref<IBufferCopier> copier;
+  UNWRAP_OR_FWD_RESULT(copier, copierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
+  vector<ImmutableRef<IBufferCopier>> outputBufferCopiers;
+  UNWRAP_MOVE_OR_FWD_RESULT(outputBufferCopiers, createOutputBufferCopierVector(copier.get()));
 
   return makeRefResultNonNull<Filter>(new (nothrow) CudaMemcpyFilter(
       relocatableCudaBufferFactory.get(),
       bufferSliceFactory.get(),
       memSet.get(),
-      cudaCopier.get()));
+      cudaCopier.get(),
+      std::move(outputBufferCopiers)));
 }
 
 CudaMemcpyFilter::CudaMemcpyFilter(
     IRelocatableResizableBufferFactory* relocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory,
     IMemSet* memSet,
-    IBufferCopier* cudaCopier) noexcept
-    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
+    IBufferCopier* cudaCopier,
+    std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, std::move(portOutputCopiers), memSet),
       mMemCopier(cudaCopier) {}
 
 size_t CudaMemcpyFilter::getOutputDataSize(size_t port) noexcept {

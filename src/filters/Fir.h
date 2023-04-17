@@ -37,8 +37,7 @@ class Fir final : public BaseFilter {
       size_t decimation,
       const float* taps,
       size_t tapCount,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       IFactories* factories) noexcept;
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
@@ -58,8 +57,7 @@ class Fir final : public BaseFilter {
   size_t mDecimation;
   Ref<IMemory> mTaps;
   size_t mTapCount;
-  cudaStream_t mCudaStream;
-  int32_t mCudaDevice;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
   const size_t mElementSize;
 
  private:
@@ -70,13 +68,13 @@ class Fir final : public BaseFilter {
   Fir(SampleType tapType,
       SampleType elementType,
       size_t decimation,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       IAllocator* allocator,
       IBufferCopier* hostToDeviceBufferCopier,
       IRelocatableResizableBufferFactory* relocatableBufferFactory,
       IBufferSliceFactory* bufferSliceFactory,
-      IMemSet* memSet) noexcept;
+      IMemSet* memSet,
+      std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept;
 
   REF_COUNTED(Fir);
 };

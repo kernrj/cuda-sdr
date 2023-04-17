@@ -18,6 +18,7 @@
 
 #include <cuComplex.h>
 #include <gsdr/gsdr.h>
+#include <util/util.h>
 
 #include "CudaErrors.h"
 #include "Factories.h"
@@ -27,7 +28,7 @@ using namespace std;
 using InputType = cuComplex;
 using OutputType = float;
 
-Result<Filter> QuadAmDemod::create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept {
+Result<Filter> QuadAmDemod::create(ICudaCommandQueue* commandQueue, IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
   Ref<IMemSet> memSet;
@@ -35,26 +36,31 @@ Result<Filter> QuadAmDemod::create(int32_t cudaDevice, cudaStream_t cudaStream, 
 
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
-      factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, 32, false));
-  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+      factories->createRelocatableCudaBufferFactory(commandQueue, 32, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(commandQueue));
+
+  auto copierFactory = factories->getCudaBufferCopierFactory();
+  Ref<IBufferCopier> copier;
+  UNWRAP_OR_FWD_RESULT(copier, copierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
+  vector<ImmutableRef<IBufferCopier>> portOutputCopiers;
+  UNWRAP_MOVE_OR_FWD_RESULT(portOutputCopiers, createOutputBufferCopierVector(copier.get()));
 
   return makeRefResultNonNull<Filter>(new (nothrow) QuadAmDemod(
-      cudaDevice,
-      cudaStream,
+      commandQueue,
       relocatableCudaBufferFactory.get(),
       bufferSliceFactory.get(),
-      memSet.get()));
+      memSet.get(),
+      std::move(portOutputCopiers)));
 }
 
 QuadAmDemod::QuadAmDemod(
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IRelocatableResizableBufferFactory* relocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory,
-    IMemSet* memSet) noexcept
-    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
-      mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream) {}
+    IMemSet* memSet,
+    std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, std::move(portOutputCopiers), memSet),
+      mCommandQueue(commandQueue) {}
 
 size_t QuadAmDemod::getOutputSizeAlignment(size_t port) noexcept {
   GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
@@ -88,8 +94,8 @@ Status QuadAmDemod::readOutput(IBuffer** portOutputBuffers, size_t portCount) no
       inputBuffer->readPtr<InputType>(),
       outputBuffer->writePtr<OutputType>(),
       numOutputElements,
-      mCudaDevice,
-      mCudaStream));
+      mCommandQueue->cudaDevice(),
+      mCommandQueue->cudaStream()));
 
   const size_t writtenNumBytes = numOutputElements * sizeof(OutputType);
   const size_t discardNumInputBytes = numOutputElements * sizeof(InputType);

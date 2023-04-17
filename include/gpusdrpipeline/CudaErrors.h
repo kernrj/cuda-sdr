@@ -32,6 +32,12 @@ inline Status cudaErrorToStatus(cudaError_t cudaError) {
       return Status_InvalidState;
     case cudaErrorMemoryAllocation:
       return Status_OutOfMemory;
+    case cudaErrorInvalidDevice:
+    case cudaErrorFileNotFound:
+    case cudaErrorJitCompilerNotFound:
+    case cudaErrorSharedObjectSymbolNotFound:
+      return Status_NotFound;
+
     default:
       return Status_RuntimeError;
   }

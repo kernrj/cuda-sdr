@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Rick Kern <kernrj@gmail.com>
+ * Copyright 2022-2023 Rick Kern <kernrj@gmail.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -19,23 +19,35 @@
 
 #include <cuda_runtime.h>
 
+#include "Factories.h"
 #include "buffers/IBuffer.h"
+#include "commandqueue/ICudaCommandQueue.h"
+#include "filters/BaseSource.h"
 #include "filters/Filter.h"
 
-class CosineSource final : public virtual Source {
+class CosineSource final : public virtual Source, public BaseSource {
  public:
-  CosineSource(float sampleRate, float frequency, int32_t cudaDevice, cudaStream_t cudaStream) noexcept;
+  static Result<Source> create(
+      float sampleRate,
+      float frequency,
+      ICudaCommandQueue* commandQueue,
+      IFactories* factories) noexcept;
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
   Status readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexcept final;
 
  private:
+  CosineSource(
+      float sampleRate,
+      float frequency,
+      ICudaCommandQueue* commandQueue,
+      std::vector<ImmutableRef<IBufferCopier>>&& outputPortBufferCopiers) noexcept;
+
   float mSampleRate;
   float mFrequency;
   float mIndexToRadiansMultiplier;
-  int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
   float mPhi;
   size_t mAlignment;
 

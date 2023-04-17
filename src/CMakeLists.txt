@@ -26,6 +26,15 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(remez)
 
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.2
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/usr/local/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig")
 
 find_package(CUDAToolkit REQUIRED)
@@ -76,6 +85,11 @@ add_library(${LIB_TARGET_NAME}
     buffers/SysMemAllocator.cpp
     buffers/SysMemBufferCopier.cpp
     buffers/BufferFactory.cpp
+    commandqueue/CommandQueueFactory.cpp
+    commandqueue/CommandQueueFactory.h
+    commandqueue/CudaCommandQueue.cpp
+    commandqueue/CudaCommandQueue.h
+    commandqueue/CudaCommandQueueFactory.h
     driver/DriverToDot.cpp
     driver/DriverToDot.h
     driver/DriverToDotFactory.h
@@ -95,6 +109,7 @@ add_library(${LIB_TARGET_NAME}
     filters/AddConstToVectorLength.h
     filters/BaseFilter.cpp
     filters/BaseSink.cpp
+    filters/BaseSource.cpp
     filters/ComplexCosineSource.cpp
     filters/ComplexCosineSource.h
     filters/CosineSource.cpp
@@ -128,6 +143,8 @@ add_library(${LIB_TARGET_NAME}
     filters/Multiply.h
     filters/PortRemappingSink.cpp
     filters/PortRemappingSink.h
+    filters/PortRemappingSource.cpp
+    filters/PortRemappingSource.h
     filters/QuadAmDemod.cpp
     filters/QuadAmDemod.h
     filters/QuadFmDemod.cpp
@@ -135,13 +152,15 @@ add_library(${LIB_TARGET_NAME}
     filters/ReadByteCountMonitor.cpp
     filters/ReadByteCountMonitor.h
     filters/factories/ReadByteCountMonitorFactory.h
-    filters/RfToPcmAudio.cpp
-    filters/RfToPcmAudio.h
+    filters/factories/RfToPcmAudioFactory.cpp
+    filters/factories/RfToPcmAudioFactory.h
     filters/Waiter.cpp
     FileLogger.cpp
     FileLogger.h
     GSLog.cpp
     HackrfSession.cpp
+    ParseJson.cpp
+    ParseJson.h
     prototype/CudaLowPassBlock.cpp
     prototype/CudaLowPassBlock.h
     prototype/fm_deemph.cpp
@@ -156,7 +175,9 @@ add_library(${LIB_TARGET_NAME}
     prototype/wbfm_rx.h
     util/CudaUtil.cpp
     util/Thread.cpp
-    util/Window.cpp)
+    util/util.cpp
+    util/util.h
+    util/Window.cpp filters/factories/PortRemappingSourceFactory.h driver/FilterDriverFactory.cpp)
 
 target_include_directories(${LIB_TARGET_NAME}
     SYSTEM PRIVATE
@@ -166,6 +187,7 @@ target_include_directories(${LIB_TARGET_NAME}
     "${GNURADIO_ALL_INCLUDE_DIRS}"
     "${gsdr_SOURCE_DIR}/include"
     "${remez_SOURCE_DIR}/include"
+    "${nlohmann_json_SOURCE_DIR}/include"
     )
 
 target_include_directories(${LIB_TARGET_NAME}

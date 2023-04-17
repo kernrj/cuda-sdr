@@ -1,0 +1,22 @@
+variables: # Can be a literal value, calculated from other values in this file, or an object created via factory.
+  tuningFrequency: &tuningFrequency 98.5e6
+  rfSampleRate: &rfSampleRate 20e6
+  hackrf: &hackrf
+    type: hackrf
+    deviceIndex: 0
+    frequency: *tuningFrequency
+    sampleRate: *rfSampleRate
+    maxBufferCountBeforeDropping: 3
+  rfFrequencyShift:
+    type: frequencyShift
+    inputSampleRate: *rfSampleRate
+    sourceFrequency:
+    targetFrequency:
+
+
+  cosineSource: &cosineSource
+    type: cosineSource
+    sampleRate: *rfSampleRate
+    frequency: *
+
+

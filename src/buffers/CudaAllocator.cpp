@@ -24,14 +24,13 @@
 
 using namespace std;
 
-CudaAllocator::CudaAllocator(int32_t cudaDevice, cudaStream_t cudaStream, size_t alignment, bool useHostMemory) noexcept
-    : mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream),
+CudaAllocator::CudaAllocator(ICudaCommandQueue* commandQueue, size_t alignment, bool useHostMemory) noexcept
+    : mCommandQueue(commandQueue),
       mAlignment(max<size_t>(1, alignment)),
       mUseHostMemory(useHostMemory) {}
 
 Result<IMemory> CudaAllocator::allocate(size_t size) noexcept {
-  CUDA_DEV_PUSH_POP_OR_RET_RESULT(mCudaDevice);
+  CUDA_DEV_PUSH_POP_OR_RET_RESULT(mCommandQueue->cudaDevice());
 
   if (size == 0) {
     return makeRefResultNonNull<IMemory>(new (nothrow) Memory(nullptr, 0, nullptr, nullptr));
@@ -43,7 +42,7 @@ Result<IMemory> CudaAllocator::allocate(size_t size) noexcept {
       memoryType,
       size,
       mAlignment,
-      mCudaStream);
+      mCommandQueue->cudaStream());
 
   if (size > INT64_MAX) {
     gsloge("Buffer size [%zu] is too large", size);
@@ -61,7 +60,7 @@ Result<IMemory> CudaAllocator::allocate(size_t size) noexcept {
     cudaAllocResult = cudaHostAlloc(&rawBuffer, allocSize, cudaHostAllocDefault);
     deleter = cudaHostMemDeleter;
   } else {
-    cudaAllocResult = cudaMallocAsync(&rawBuffer, allocSize, mCudaStream);
+    cudaAllocResult = cudaMallocAsync(&rawBuffer, allocSize, mCommandQueue->cudaStream());
     deleter = cudaGpuMemDeleter;
   }
 
@@ -69,14 +68,20 @@ Result<IMemory> CudaAllocator::allocate(size_t size) noexcept {
       cudaAllocResult == cudaSuccess,
       "Failed to allocate CUDA memory with size [%zu] on GPU [%d] stream [%p] host memory? [%d]",
       allocSize,
-      mCudaDevice,
-      mCudaStream,
+      mCommandQueue->cudaDevice(),
+      mCommandQueue->cudaStream(),
       mUseHostMemory);
 
   auto startAddress =
       reinterpret_cast<uint8_t*>(reinterpret_cast<intptr_t>(rawBuffer + mAlignment - 1) / mAlignment * mAlignment);
 
-  IMemory* memory = new (nothrow) CudaMemory(startAddress, usableLength, mCudaDevice, mCudaStream, deleter, rawBuffer);
+  IMemory* memory = new (nothrow) CudaMemory(
+      startAddress,
+      usableLength,
+      mCommandQueue->cudaDevice(),
+      mCommandQueue->cudaStream(),
+      deleter,
+      rawBuffer);
 
   return makeRefResultNonNull(memory);
 }

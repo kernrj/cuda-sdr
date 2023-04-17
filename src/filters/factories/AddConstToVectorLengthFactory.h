@@ -24,11 +24,26 @@ class AddConstToVectorLengthFactory final : public IAddConstToVectorLengthFactor
  public:
   explicit AddConstToVectorLengthFactory(IFactories* factories)
       : mFactories(factories) {}
+
+  Result<Node> create(const char* jsonParameters) noexcept final {
+    nlohmann::json params;
+    UNWRAP_OR_FWD_RESULT(params, parseJson(jsonParameters));
+
+    const std::string commandQueueId = params["commandQueue"];
+    Ref<ICudaCommandQueue> commandQueue;
+    UNWRAP_OR_FWD_RESULT(
+        commandQueue,
+        mFactories->getCommandQueueFactory()->getCudaCommandQueue(commandQueueId.c_str()));
+
+    return ResultCast<Node>(createAddConstToVectorLength(
+        params["addValueToMagnitude"],
+        commandQueue.get()));
+  }
+
   Result<Filter> createAddConstToVectorLength(
       float addValueToMagnitude,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept final {
-    return AddConstToVectorLength::create(addValueToMagnitude, cudaDevice, cudaStream, mFactories);
+      ICudaCommandQueue* commandQueue) noexcept final {
+    return AddConstToVectorLength::create(addValueToMagnitude, commandQueue, mFactories);
   }
 
  private:

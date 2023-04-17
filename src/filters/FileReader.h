@@ -17,11 +17,13 @@
 #ifndef GPUSDR_FILEREADER_H
 #define GPUSDR_FILEREADER_H
 
-#include "filters/Filter.h"
+#include "Factories.h"
+#include "Result.h"
+#include "filters/BaseSource.h"
 
-class FileReader final : public virtual Source {
+class FileReader final : public BaseSource {
  public:
-  explicit FileReader(const char* fileName) noexcept;
+  static Result<Source> create(const std::string& fileName, IFactories* factories);
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
@@ -32,7 +34,12 @@ class FileReader final : public virtual Source {
   const std::string mFileName;
   FILE* const mFile;
 
+ private:
+  explicit FileReader(
+      const std::string& fileName,
+      std::vector<ImmutableRef<IBufferCopier>>&& outputPortBufferCopiers) noexcept;
   ~FileReader() final;
+
   REF_COUNTED_NO_DESTRUCTOR(FileReader);
 };
 

@@ -31,8 +31,7 @@ class RelocatableCudaBufferFactory final : public IRelocatableCudaBufferFactory 
 
   Result<IRelocatableResizableBuffer> createCudaBuffer(
       size_t minSize,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       size_t alignment,
       bool useHostMemory) noexcept final;
 

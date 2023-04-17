@@ -17,7 +17,10 @@
 #ifndef GPUSDRPIPELINE_HACKRFSOURCEFACTORY_H
 #define GPUSDRPIPELINE_HACKRFSOURCEFACTORY_H
 
+#include <nlohmann/json.hpp>
+
 #include "../HackrfSource.h"
+#include "ParseJson.h"
 #include "filters/FilterFactories.h"
 
 class HackrfSourceFactory final : public IHackrfSourceFactory {
@@ -25,19 +28,36 @@ class HackrfSourceFactory final : public IHackrfSourceFactory {
   explicit HackrfSourceFactory(IFactories* factories) noexcept
       : mFactories(factories) {}
 
+  Result<Node> create(const char* jsonParameters) noexcept final {
+    nlohmann::json params;
+
+    UNWRAP_OR_FWD_RESULT(params, parseJson(jsonParameters));
+
+    const int32_t deviceIndex = params["deviceIndex"].get<int32_t>();
+    const uint64_t centerFrequency = params["centerFrequency"].get<uint32_t>();
+    const double sampleRate = params["sampleRate"].get<float>();
+    size_t maxBufferCountBeforeDropping = 3;
+    const std::string keyMaxBufferCountBeforeDropping = "maxBufferCountBeforeDropping";
+    if (params.contains(keyMaxBufferCountBeforeDropping)) {
+      UNWRAP_OR_FWD_RESULT(maxBufferCountBeforeDropping, getJsonOrErr<size_t>(params, keyMaxBufferCountBeforeDropping));
+    }
+
+    return ResultCast<Node>(createHackrfSource(deviceIndex, centerFrequency, sampleRate, maxBufferCountBeforeDropping));
+  }
+
   Result<IHackrfSource> createHackrfSource(
       int32_t deviceIndex,
-      uint64_t frequency,
+      uint64_t centerFrequency,
       double sampleRate,
       size_t maxBufferCountBeforeDropping) noexcept final {
-    Ref<IHackrfSource> hackrfSource;
+    StealableRef<IHackrfSource> hackrfSource;
     UNWRAP_OR_FWD_RESULT(
         hackrfSource,
-        HackrfSource::create(frequency, sampleRate, maxBufferCountBeforeDropping, mFactories));
+        HackrfSource::create(centerFrequency, sampleRate, maxBufferCountBeforeDropping, mFactories));
 
     FWD_IN_RESULT_IF_ERR(hackrfSource->selectDeviceByIndex(deviceIndex));
 
-    return makeRefResultNonNull(hackrfSource.get());
+    return makeRefResultNonNull(hackrfSource.steal());
   }
 
  private:

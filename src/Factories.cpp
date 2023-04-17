@@ -16,6 +16,9 @@
 
 #include "Factories.h"
 
+#include <commandqueue/CudaCommandQueueFactory.h>
+#include <filters/factories/PortRemappingSourceFactory.h>
+
 #include <mutex>
 #include <stdexcept>
 
@@ -34,6 +37,7 @@
 #include "buffers/SysMemAllocator.h"
 #include "buffers/SysMemBufferCopier.h"
 #include "buffers/SysMemSet.h"
+#include "commandqueue/CommandQueueFactory.h"
 #include "driver/DriverToDotFactory.h"
 #include "driver/FilterDriverFactory.h"
 #include "driver/SteppingDriverFactory.h"
@@ -73,8 +77,8 @@ class Factories final : public IFactories {
         mAacFileWriterFactory(new AacFileWriterFactory(this)),
         mAddConstFactory(new AddConstFactory(this)),
         mAddConstToVectorLengthFactory(new AddConstToVectorLengthFactory(this)),
-        mCosineSourceFactory(new CosineSourceFactory()),
-        mFileReaderFactory(new FileReaderFactory()),
+        mCosineSourceFactory(new CosineSourceFactory(this)),
+        mFileReaderFactory(new FileReaderFactory(this)),
         mFirFactory(new FirFactory(this)),
         mHackrfSourceFactory(new HackrfSourceFactory(this)),
         mInt8ToFloatFactory(new Int8ToFloatFactory(this)),
@@ -86,9 +90,12 @@ class Factories final : public IFactories {
         mSteppingDriverFactory(new SteppingDriverFactory()),
         mFilterDriverFactory(new FilterDriverFactory(this)),
         mPortRemappingSinkFactory(new PortRemappingSinkFactory()),
+        mPortRemappingSourceFactory(new PortRemappingSourceFactory(this)),
         mRfToPcmAudioFactory(new RfToPcmAudioFactory(this)),
         mReadByteCountMonitorFactory(new ReadByteCountMonitorFactory()),
-        mDriverToDotFactory(new DriverToDotFactory()) {}
+        mDriverToDotFactory(new DriverToDotFactory()),
+        mCommandQueueFactory(new CommandQueueFactory(this)),
+        mCudaCommandQueueFactory(new CudaCommandQueueFactory()) {}
 
   IResizableBufferFactory* getResizableBufferFactory() noexcept final { return mResizableBufferFactory; }
   ICudaAllocatorFactory* getCudaAllocatorFactory() noexcept final { return mCudaAllocatorFactory; }
@@ -100,11 +107,7 @@ class Factories final : public IFactories {
   ICudaMemcpyFilterFactory* getCudaMemcpyFilterFactory() noexcept final { return mCudaMemcpyFilterFactory; }
   IAacFileWriterFactory* getAacFileWriterFactory() noexcept final { return mAacFileWriterFactory; }
   IAddConstFactory* getAddConstFactory() noexcept final { return mAddConstFactory; }
-
-  IAddConstToVectorLengthFactory* getAddConstToVectorLengthFactory() noexcept final {
-    return mAddConstToVectorLengthFactory;
-  }
-
+  IAddConstToVectorLengthFactory* getAddConstToVectorLengthFactory() noexcept final { return mAddConstToVectorLengthFactory; }
   ICosineSourceFactory* getCosineSourceFactory() noexcept final { return mCosineSourceFactory; }
   IFileReaderFactory* getFileReaderFactory() noexcept final { return mFileReaderFactory; }
   IFirFactory* getFirFactory() noexcept final { return mFirFactory; }
@@ -118,10 +121,13 @@ class Factories final : public IFactories {
   ISteppingDriverFactory* getSteppingDriverFactory() noexcept final { return mSteppingDriverFactory; }
   IFilterDriverFactory* getFilterDriverFactory() noexcept final { return mFilterDriverFactory; }
   IPortRemappingSinkFactory* getPortRemappingSinkFactory() noexcept final { return mPortRemappingSinkFactory; }
+  IPortRemappingSourceFactory* getPortRemappingSourceFactory() noexcept final { return mPortRemappingSourceFactory; };
   IRfToPcmAudioFactory* getRfToPcmAudioFactory() noexcept final { return mRfToPcmAudioFactory; }
   IReadByteCountMonitorFactory* getReadByteCountMonitorFactory() noexcept final { return mReadByteCountMonitorFactory; }
   IDriverToDiagramFactory* getDriverToDotFactory() noexcept final { return mDriverToDotFactory; }
   IBufferRangeFactory* getBufferRangeFactory() noexcept final { return mBufferRangeFactory; }
+  ICommandQueueFactory* getCommandQueueFactory() noexcept final { return mCommandQueueFactory; }
+  ICudaCommandQueueFactory* getCudaCommandQueueFactory() noexcept final { return mCudaCommandQueueFactory; }
 
   Result<IRelocatableResizableBufferFactory> createRelocatableResizableBufferFactory(
       IAllocator* allocator,
@@ -169,9 +175,12 @@ class Factories final : public IFactories {
   ConstRef<ISteppingDriverFactory> mSteppingDriverFactory;
   ConstRef<IFilterDriverFactory> mFilterDriverFactory;
   ConstRef<IPortRemappingSinkFactory> mPortRemappingSinkFactory;
+  ConstRef<IPortRemappingSourceFactory> mPortRemappingSourceFactory;
   ConstRef<IRfToPcmAudioFactory> mRfToPcmAudioFactory;
   ConstRef<IReadByteCountMonitorFactory> mReadByteCountMonitorFactory;
   ConstRef<IDriverToDiagramFactory> mDriverToDotFactory;
+  ConstRef<ICommandQueueFactory> mCommandQueueFactory;
+  ConstRef<ICudaCommandQueueFactory> mCudaCommandQueueFactory;
 
   ~Factories() final = default;
 

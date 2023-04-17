@@ -92,6 +92,52 @@ class ImmutableRef final {
 };
 
 template <typename T>
+class StealableRef final {
+ public:
+  StealableRef() noexcept
+      : mReffed(nullptr) {}
+
+  explicit StealableRef(T* reffed) noexcept
+      : mReffed(reffed) {
+    if (mReffed != nullptr) {
+      mReffed->ref();
+    }
+  }
+
+  ~StealableRef() {
+    T *const item = steal();
+    if (item != nullptr) {
+      item->unref();
+    }
+  }
+
+  StealableRef& operator=(T* item) {
+    T* oldItem = mReffed.exchange(item);
+
+    if (oldItem != nullptr) {
+      oldItem->unref();
+    }
+
+    if (item != nullptr) {
+      item->ref();
+    }
+
+    return *this;
+  }
+
+  T* steal() noexcept {
+    return mReffed.exchange(nullptr);
+  }
+
+  operator ImmutableRef<T>() const noexcept { return ImmutableRef<T>(mReffed.load()); }
+  ImmutableRef<T> operator->() const noexcept { return ImmutableRef<T>(mReffed.load()); }
+  ImmutableRef<T> get() const noexcept { return ImmutableRef<T>(mReffed.load()); }
+
+ private:
+  std::atomic<T*> mReffed;
+};
+
+template <typename T>
 using ConstRef = const ImmutableRef<T>;
 
 template <typename T, typename = typename std::enable_if<std::is_base_of<IRef, T>::value>::type>

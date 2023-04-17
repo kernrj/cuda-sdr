@@ -22,5 +22,7 @@ BaseFilter::BaseFilter(
     IRelocatableResizableBufferFactory* relocatableResizableBufferFactory,
     IBufferSliceFactory* slicedBufferFactory,
     size_t inputPortCount,
+    std::vector<ImmutableRef<IBufferCopier>>&& outputPortBufferCopiers,
     IMemSet* memSet) noexcept
-    : BaseSink(relocatableResizableBufferFactory, slicedBufferFactory, inputPortCount, memSet) {}
+    : BaseSink(relocatableResizableBufferFactory, slicedBufferFactory, inputPortCount, memSet),
+      BaseSource(std::move(outputPortBufferCopiers)) {}

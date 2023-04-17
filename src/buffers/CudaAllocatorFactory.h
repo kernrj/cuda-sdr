@@ -22,8 +22,7 @@
 class CudaAllocatorFactory final : public ICudaAllocatorFactory {
  public:
   Result<IAllocator> createCudaAllocator(
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       size_t alignment,
       bool useHostMemory) noexcept final;
 

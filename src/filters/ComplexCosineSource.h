@@ -19,12 +19,19 @@
 
 #include <cuda_runtime.h>
 
+#include "Factories.h"
 #include "buffers/IBuffer.h"
+#include "commandqueue/ICudaCommandQueue.h"
+#include "filters/BaseSource.h"
 #include "filters/Filter.h"
 
-class ComplexCosineSource final : public virtual Source {
+class ComplexCosineSource final : public virtual Source, public BaseSource {
  public:
-  ComplexCosineSource(float sampleRate, float frequency, int32_t cudaDevice, cudaStream_t cudaStream) noexcept;
+  static Result<Source> create(
+      float sampleRate,
+      float frequency,
+      ICudaCommandQueue* commandQueue,
+      IFactories* factories) noexcept;
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
@@ -34,10 +41,16 @@ class ComplexCosineSource final : public virtual Source {
   float mSampleRate;
   float mFrequency;
   float mIndexToRadiansMultiplier;
-  int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
   float mPhi;
   size_t mAlignment;
+
+ private:
+  ComplexCosineSource(
+      float sampleRate,
+      float frequency,
+      ICudaCommandQueue* commandQueue,
+      std::vector<ImmutableRef<IBufferCopier>>&& outputPortBufferCopiers) noexcept;
 
   REF_COUNTED(ComplexCosineSource);
 };

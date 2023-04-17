@@ -20,14 +20,14 @@
 #include <cuda_runtime.h>
 #include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/buffers/IBufferCopier.h>
+#include <gpusdrpipeline/commandqueue/ICudaCommandQueue.h>
 
 #include <cstdint>
 
 class ICudaBufferCopierFactory : public virtual IRef {
  public:
   [[nodiscard]] virtual Result<IBufferCopier> createBufferCopier(
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       cudaMemcpyKind memcpyKind) noexcept = 0;
 
   ABSTRACT_IREF(ICudaBufferCopierFactory);

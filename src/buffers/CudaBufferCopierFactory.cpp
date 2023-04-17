@@ -21,9 +21,8 @@
 using namespace std;
 
 Result<IBufferCopier> CudaBufferCopierFactory::createBufferCopier(
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     cudaMemcpyKind memcpyKind) noexcept {
-  IBufferCopier* copier = new (nothrow) CudaBufferCopier(cudaDevice, cudaStream, memcpyKind);
+  IBufferCopier* copier = new (nothrow) CudaBufferCopier(commandQueue, memcpyKind);
   return makeRefResultNonNull(copier);
 }

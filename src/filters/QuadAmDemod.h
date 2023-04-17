@@ -24,7 +24,7 @@
 
 class QuadAmDemod final : public BaseFilter {
  public:
-  static Result<Filter> create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept;
+  static Result<Filter> create(ICudaCommandQueue* commandQueue, IFactories* factories) noexcept;
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
@@ -32,16 +32,15 @@ class QuadAmDemod final : public BaseFilter {
   [[nodiscard]] size_t preferredInputBufferSize(size_t port) noexcept final;
 
  private:
-  const int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
 
  private:
   QuadAmDemod(
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       IRelocatableResizableBufferFactory* relocatableBufferFactory,
       IBufferSliceFactory* bufferSliceFactory,
-      IMemSet* memSet) noexcept;
+      IMemSet* memSet,
+      std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept;
 
   REF_COUNTED(QuadAmDemod);
 };

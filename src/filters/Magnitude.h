@@ -24,7 +24,7 @@
 
 class Magnitude final : public BaseFilter {
  public:
-  static Result<Filter> create(int32_t cudaDevice, cudaStream_t cudaStream, IFactories* factories) noexcept;
+  static Result<Filter> create(ICudaCommandQueue* commandQueue, IFactories* factories) noexcept;
 
   [[nodiscard]] size_t getOutputDataSize(size_t port) noexcept final;
   [[nodiscard]] size_t getOutputSizeAlignment(size_t port) noexcept final;
@@ -33,19 +33,18 @@ class Magnitude final : public BaseFilter {
 
  private:
   static const size_t mAlignment;
-  int32_t mCudaDevice;
-  cudaStream_t mCudaStream;
+  ConstRef<ICudaCommandQueue> mCommandQueue;
 
  private:
   [[nodiscard]] size_t getAvailableNumInputElements() const noexcept;
 
  private:
   Magnitude(
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       IRelocatableResizableBufferFactory* relocatableBufferFactory,
       IBufferSliceFactory* bufferSliceFactory,
-      IMemSet* memSet) noexcept;
+      IMemSet* memSet,
+      std::vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept;
 
   REF_COUNTED(Magnitude);
 };

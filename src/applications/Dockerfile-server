@@ -1,0 +1,17 @@
+FROM ubuntu:22.04
+
+RUN apt-get update -y && \
+    apt-get upgrade -y && \
+    apt-get install -y libnghttp2-dev build-essential cmake ninja-build && \
+    mkdir /src
+
+COPY include /app/
+COPY src /app/
+
+RUN cd /app && \
+    rm -fr build && \
+    mkdir build && \
+    cd build && \
+    cmake -GNinja -DCMAKE_BUILD_TYPE=Release .. && \
+    ninja && \
+    ninja install

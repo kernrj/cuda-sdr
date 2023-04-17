@@ -25,15 +25,41 @@ class FirFactory final : public IFirFactory {
   explicit FirFactory(IFactories* factories) noexcept
       : mFactories(factories) {}
 
+  Result<Node> create(const char* jsonParameters) noexcept final {
+    nlohmann::json params;
+    UNWRAP_OR_FWD_RESULT(params, parseJson(jsonParameters));
+
+    const std::string commandQueueId = params["commandQueue"];
+    Ref<ICudaCommandQueue> commandQueue;
+    UNWRAP_OR_FWD_RESULT(
+        commandQueue,
+        mFactories->getCommandQueueFactory()->getCudaCommandQueue(commandQueueId.c_str()));
+
+    SampleType tapType;
+    SampleType elementType;
+
+    std::vector<float> taps = params["taps"];
+
+    UNWRAP_OR_FWD_RESULT(tapType, parseSampleType(params["tapType"].get<std::string>()));
+    UNWRAP_OR_FWD_RESULT(elementType, parseSampleType(params["elementType"].get<std::string>()));
+
+    return ResultCast<Node>(createFir(
+        tapType,
+        elementType,
+        params["decimation"],
+        taps.data(),
+        taps.size(),
+        commandQueue.get()));
+  }
+
   Result<Filter> createFir(
       SampleType tapType,
       SampleType elementType,
       size_t decimation,
       const float* taps,
       size_t tapCount,
-      int32_t cudaDevice,
-      cudaStream_t cudaStream) noexcept final {
-    return Fir::create(tapType, elementType, decimation, taps, tapCount, cudaDevice, cudaStream, mFactories);
+      ICudaCommandQueue* commandQueue) noexcept final {
+    return Fir::create(tapType, elementType, decimation, taps, tapCount, commandQueue, mFactories);
   }
 
  private:

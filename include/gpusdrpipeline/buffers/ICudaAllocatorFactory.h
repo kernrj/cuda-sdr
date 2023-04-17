@@ -20,12 +20,12 @@
 #include <cuda_runtime.h>
 #include <gpusdrpipeline/Result.h>
 #include <gpusdrpipeline/buffers/IAllocator.h>
+#include <gpusdrpipeline/commandqueue/ICudaCommandQueue.h>
 
 class ICudaAllocatorFactory : public virtual IRef {
  public:
   [[nodiscard]] virtual Result<IAllocator> createCudaAllocator(
-      int32_t cudaDevice,
-      cudaStream_t cudaStream,
+      ICudaCommandQueue* commandQueue,
       size_t alignment,
       bool useHostMemory) noexcept = 0;
 

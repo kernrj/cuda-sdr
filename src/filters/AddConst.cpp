@@ -17,6 +17,7 @@
 #include "AddConst.h"
 
 #include <gsdr/gsdr.h>
+#include <util/util.h>
 
 #include "CudaErrors.h"
 
@@ -26,8 +27,7 @@ const size_t AddConst::mAlignment = 32;
 
 Result<Filter> AddConst::create(
     float addValueToMagnitude,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IFactories* factories) noexcept {
   Ref<IRelocatableResizableBufferFactory> relocatableCudaBufferFactory;
   ConstRef<IBufferSliceFactory> bufferSliceFactory = factories->getBufferSliceFactory();
@@ -36,29 +36,34 @@ Result<Filter> AddConst::create(
 
   UNWRAP_OR_FWD_RESULT(
       relocatableCudaBufferFactory,
-      factories->createRelocatableCudaBufferFactory(cudaDevice, cudaStream, mAlignment, false));
-  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(cudaDevice, cudaStream));
+      factories->createRelocatableCudaBufferFactory(commandQueue, mAlignment, false));
+  UNWRAP_OR_FWD_RESULT(memSet, factories->getCudaMemSetFactory()->create(commandQueue));
+
+  auto copierFactory = factories->getCudaBufferCopierFactory();
+  Ref<IBufferCopier> copier;
+  UNWRAP_OR_FWD_RESULT(copier, copierFactory->createBufferCopier(commandQueue, cudaMemcpyDeviceToDevice));
+  vector<ImmutableRef<IBufferCopier>> outputBufferCopiers;
+  UNWRAP_MOVE_OR_FWD_RESULT(outputBufferCopiers, createOutputBufferCopierVector(copier.get()));
 
   return makeRefResultNonNull<Filter>(new (nothrow) AddConst(
       addValueToMagnitude,
-      cudaDevice,
-      cudaStream,
+      commandQueue,
       relocatableCudaBufferFactory.get(),
       bufferSliceFactory.get(),
-      memSet.get()));
+      memSet.get(),
+      std::move(outputBufferCopiers)));
 }
 
 AddConst::AddConst(
     float addConst,
-    int32_t cudaDevice,
-    cudaStream_t cudaStream,
+    ICudaCommandQueue* commandQueue,
     IRelocatableResizableBufferFactory* relocatableBufferFactory,
     IBufferSliceFactory* bufferSliceFactory,
-    IMemSet* memSet) noexcept
-    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, memSet),
+    IMemSet* memSet,
+    vector<ImmutableRef<IBufferCopier>>&& portOutputCopiers) noexcept
+    : BaseFilter(relocatableBufferFactory, bufferSliceFactory, 1, std::move(portOutputCopiers), memSet),
       mAddConst(addConst),
-      mCudaDevice(cudaDevice),
-      mCudaStream(cudaStream) {}
+      mCommandQueue(commandQueue) {}
 
 size_t AddConst::getOutputDataSize(size_t port) noexcept {
   GS_REQUIRE_OR_RET_FMT(0 == port, 0, "Output port [%zu] is out of range", port);
@@ -96,8 +101,8 @@ Status AddConst::readOutput(IBuffer** portOutputBuffers, size_t numPorts) noexce
       mAddConst,
       outputBuffer->writePtr<float>(),
       processNumElements,
-      mCudaDevice,
-      mCudaStream));
+      mCommandQueue->cudaDevice(),
+      mCommandQueue->cudaStream()));
 
   const size_t writtenNumBytes = processNumElements * sizeof(float);
   FWD_IF_ERR(outputBuffer->range()->increaseEndOffset(writtenNumBytes));
